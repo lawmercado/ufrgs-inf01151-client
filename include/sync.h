@@ -1,12 +1,6 @@
 #ifndef __SYNC___
 #define __SYNC___
 
-#define MAX_FILENAME_LENGTH 255
-#define MAX_PATH_LENGTH 4096
-
-#define TRUE 1
-#define FALSE 0
-
 /**
  * Initializes the synchronization in the specified directory to be synchronized
  *

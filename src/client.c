@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "client.h"
+#include "file.h"
 #include "comm.h"
 #include "sync.h"
 #include "log.h"
