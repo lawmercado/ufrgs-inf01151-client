@@ -1,13 +1,20 @@
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -DDEBUG
+SRC = src
+TESTS = test
+FILES = $(SRC)/comm.c $(SRC)/sync.c $(SRC)/utils.c
+CMD = $(CC) $(CFLAGS) $(FILES) -lpthread -Iinclude
 
-CLIENT_OBJ = main.o communication.o
+all: client comm_test sync_test
 
-all: client
-	 @echo "All files compiled!"
+client:
+	$(CMD) $(SRC)/client.c -o client
 
-client: $(CLIENT_OBJ)
-	$(CC) $(CFLAGS) $(CLIENT_OBJ) -o $@ -pthread -Iinclude
+comm_test:
+	$(CMD) $(TESTS)/comm_test.c -o comm_test
 
-clean: 
-	rm -f *.o client
+sync_test:
+	$(CMD) $(TESTS)/sync_test.c -o sync_test
+
+clean:
+	rm -f client comm_test sync_test

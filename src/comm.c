@@ -1,15 +1,15 @@
-#include "communication.h"
+#include "comm.h"
 
 int logout(int sockfd){
-    
+
 	close(sockfd);
 	return 0;
 }
 
 void __create_socket(struct sockaddr_in *serv_addr, int port, struct hostent *server){
 
-	serv_addr->sin_family = AF_INET;     
-	serv_addr->sin_port = htons(port);    
+	serv_addr->sin_family = AF_INET;
+	serv_addr->sin_port = htons(port);
 	serv_addr->sin_addr = *((struct in_addr *) server->h_addr);
 
 	//TODO VERIFICAR ESSE BZERO
@@ -24,7 +24,7 @@ int __send_packet(int *id_msg, char *buffer, int sockfd, struct sockaddr_in *ser
 		int s,				=> descriptor for socket
 		const void * msg,	=> pointer to the message that we want to send
 		size_t len, 		=> length of message
-		int flags			=> 
+		int flags			=>
 		const struct sockaddr *to > pointer to a sockaddr object that specifies the addess of the target
 		socklen_t tolen 	=> object that specifies the size of the target
 	)
@@ -72,7 +72,7 @@ int __send_packet(int *id_msg, char *buffer, int sockfd, struct sockaddr_in *ser
 
 		packet.ack = 1;
 	}
-	
+
 
 	*id_msg = *id_msg +1;
 	return 0;
@@ -91,7 +91,7 @@ int __send_msg(int sockfd, char buffer[BUFFER_SIZE], struct sockaddr_in serv_add
 	}
 
 
-	
+
 
 	printf("Got an ack: %s\n", buffer);
 	return 0;
@@ -99,18 +99,18 @@ int __send_msg(int sockfd, char buffer[BUFFER_SIZE], struct sockaddr_in serv_add
 }
 
 int login(char *server_raw, char *port_raw){
-	
+
     int sockfd;
 	struct sockaddr_in serv_addr, from;
 	struct hostent *server;
 	char buffer[BUFFER_SIZE];
-	
+
 	int port = atoi(port_raw);
 
 	if ((server = gethostbyname(server_raw)) == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
-    }	
+    }
 
 	//socket (int domain, int type, int protocol)
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -127,9 +127,8 @@ int login(char *server_raw, char *port_raw){
 		printf("[Error sending message]\n");
 	}
 
-	
-		
+
+
 	return sockfd;
 
 }
-
