@@ -1,31 +1,33 @@
 #ifndef __SYNC___
 #define __SYNC___
 
-#define RET_ERROR -1
-#define RET_SUCCESS 0
+#define MAX_PATH_SIZE 256
+
 #define TRUE 1
 #define FALSE 0
 
 /**
- * Initializes the syncronisation in the specified directory to be syncronized
+ * Initializes the synchronization in the specified directory to be synchronized
  *
- * @param char* dir_path The directory to be syncronized
- * @return RET_SUCCESS if no errors, RET_ERROR otherwise
+ * @param char* dir_path The directory to be synchronized
+ * @return 0 if no errors, -1 otherwise
  */
-int sync_init( char *dir_path );
+int sync_init(char *dir_path);
 
 /**
- * Stop the syncronisation process
+ * Stop the synchronization process
  *
  */
 void sync_stop();
 
 /**
- * Updates the file in the syncronized dir
+ * Updates the file in the synchronized directory
  *
  * @param char* name The name of the file
- * @param char* content The content of the file
+ * @param char* buffer The content of the file
+ * @param int length The buffer size of the file
+ * @return 0 if no errors, -1 otherwise
  */
-int sync_update_file( char *name, char *content );
+int sync_update_file(char *name, char *buffer, int length);
 
 #endif
