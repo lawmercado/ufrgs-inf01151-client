@@ -1,7 +1,8 @@
 #ifndef __SYNC___
 #define __SYNC___
 
-#define MAX_PATH_SIZE 256
+#define MAX_FILENAME_LENGTH 255
+#define MAX_PATH_LENGTH 4096
 
 #define TRUE 1
 #define FALSE 0

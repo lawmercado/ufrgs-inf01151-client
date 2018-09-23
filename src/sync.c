@@ -193,15 +193,15 @@ void sync_stop()
  * @param int length The buffer size of the file
  * @return 0 if no errors, -1 otherwise
  */
-int sync_update_file(char *name, char *buffer, int length)
+int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
 {
     FILE *file = NULL;
-    char path[MAX_PATH_SIZE];
+    char path[MAX_PATH_LENGTH];
     int bytes_writen = 0, has_errors = 0;
 
     sync_stop();
 
-    bzero((void *)path, MAX_PATH_SIZE);
+    bzero((void *)path, MAX_PATH_LENGTH);
 
     strcat(path, __watched_dir_path);
     strcat(path, "/");
