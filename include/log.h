@@ -1,5 +1,5 @@
-#ifndef __LOG___
-#define __LOG___
+#ifndef __LOG_H___
+#define __LOG_H___
 
 #define MAX_MESSAGE_LENGTH 255
 

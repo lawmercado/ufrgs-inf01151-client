@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <dirent.h>
 #include <sys/inotify.h>
-#include <string.h>
 #include "sync.h"
+#include "file.h"
 #include "log.h"
 
 #define EVENT_SIZE (sizeof (struct inotify_event))
@@ -15,8 +15,8 @@
 pthread_t __watcher_thread;
 pthread_mutex_t __event_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t __events_done_processing = PTHREAD_COND_INITIALIZER;
-int __is_event_processing = FALSE;
-int __stop_event_handling = FALSE;
+int __is_event_processing = 0;
+int __stop_event_handling = 0;
 
 int __inotify_instance;
 int __inotify_dir_watcher;
@@ -31,7 +31,7 @@ char* __watched_dir_path;
 void __watcher_handle_event(struct inotify_event *event)
 {
     pthread_mutex_lock(&__event_handling_mutex);
-    __is_event_processing = TRUE;
+    __is_event_processing = 1;
 
     if(event->len)
     {
@@ -65,7 +65,7 @@ void __watcher_handle_event(struct inotify_event *event)
         }
     }
 
-    __is_event_processing = FALSE;
+    __is_event_processing = 0;
     pthread_cond_signal(&__events_done_processing);
     pthread_mutex_unlock(&__event_handling_mutex);
 }
@@ -128,8 +128,6 @@ void *__watcher()
  */
 int sync_init(char *dir_path)
 {
-    struct stat st = {0};
-
     __watched_dir_path = dir_path;
 
     __inotify_instance = inotify_init1(IN_NONBLOCK);
@@ -142,14 +140,16 @@ int sync_init(char *dir_path)
         return -1;
     }
 
-    // If the directory does not exist, create it
-    if(stat(dir_path, &st) == -1)
-    {
-        mkdir(dir_path, 0700);
-    }
-
     // Adding the specified directory into watch list
     __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MODIFY | IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM);
+
+    // Checking for error
+    if(__inotify_dir_watcher < 0)
+    {
+        log_error("sync", "Could not watch '%s': directory does not exists", dir_path);
+
+        return -1;
+    }
 
     if(pthread_create(&__watcher_thread, NULL, __watcher, NULL) != 0)
     {
@@ -174,7 +174,7 @@ void sync_stop()
         pthread_cond_wait(&__events_done_processing, &__event_handling_mutex);
     }
 
-    __stop_event_handling = TRUE;
+    __stop_event_handling = 1;
 
     pthread_mutex_unlock(&__event_handling_mutex);
 
@@ -195,9 +195,7 @@ void sync_stop()
  */
 int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
 {
-    FILE *file = NULL;
     char path[MAX_PATH_LENGTH];
-    int bytes_writen = 0, has_errors = 0;
 
     sync_stop();
 
@@ -207,28 +205,61 @@ int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
     strcat(path, "/");
     strcat(path, name);
 
-    log_debug("sync", "Writing in '%s'", path);
-
-    file = fopen(path, "wb");
-
-    if(file == NULL)
+    if(file_write_buffer(path, buffer, length) != 0)
     {
-        log_debug("sync", "Could not open '%s' for writing", path);
+        log_error("sync", "Could not update the file '%s'", name);
 
         return -1;
     }
 
-    bytes_writen = fwrite(buffer, sizeof(char), length, file);
-    has_errors = bytes_writen == length;
-
-    fclose(file);
-
-    has_errors ? log_debug("sync", "Write sucessfull") : log_error("sync", "Write unsucessfull for '%s'", path);
-
     if(sync_init(__watched_dir_path) != 0)
     {
         log_error("sync", "Could not initialize the synchronization process");
+
+        return -1;
     }
 
-    return has_errors;
+    return 0;
+}
+
+/**
+ * List the content of the watched directory
+ *
+ * @return 0 if no errors, -1 otherwise
+ */
+int sync_list_files()
+{
+    DIR *watched_dir;
+    struct dirent *entry;
+    char path[MAX_PATH_LENGTH];
+    MACTimestamp entryMAC;
+
+    watched_dir = opendir(__watched_dir_path);
+
+    if(watched_dir)
+    {
+        while((entry = readdir(watched_dir)) != NULL)
+        {
+            if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            {
+                continue;
+            }
+
+            bzero((void *)path, MAX_PATH_LENGTH);
+            strcat(path, __watched_dir_path);
+            strcat(path, "/");
+            strcat(path, entry->d_name);
+
+            if(file_mac(path, &entryMAC) == 0)
+            {
+                printf("M: %s | A: %s | C: %s | '%s'\n", entryMAC.m, entryMAC.a, entryMAC.c, entry->d_name);
+            }
+        }
+
+        closedir(watched_dir);
+
+        return 0;
+    }
+
+    return -1;
 }
