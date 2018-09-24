@@ -106,7 +106,7 @@ int main(int argc, char** argv)
     	exit(1);
   	}
 
-    // TODO: Call __setip and enter this loop only after sucessfull login
+    // TODO: Call __setup and enter this loop only after sucessfull login
 
     if(__setup() == 0)
     {
