@@ -147,6 +147,7 @@ int __send_msg(int sockfd, char buffer[BUFFER_SIZE], struct sockaddr_in serv_add
 
 
 	// FIRST MESSAGE TO SERVER!!
+	bzero(buffer, BUFFER_SIZE);
 	strcpy(buffer, "CLIENT COMMUNICATION");
 	if(__send_packet(&msg_counter, buffer, sockfd, &serv_addr) < 0){
 		printf("\nERROR start sending packet!!\n");
