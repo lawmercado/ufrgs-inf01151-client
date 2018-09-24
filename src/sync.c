@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <dirent.h>
 #include <sys/inotify.h>
-#include <string.h>
 #include "sync.h"
 #include "file.h"
 #include "log.h"
@@ -129,8 +128,6 @@ void *__watcher()
  */
 int sync_init(char *dir_path)
 {
-    struct stat st = {0};
-
     __watched_dir_path = dir_path;
 
     __inotify_instance = inotify_init1(IN_NONBLOCK);
@@ -143,14 +140,16 @@ int sync_init(char *dir_path)
         return -1;
     }
 
-    // If the directory does not exist, create it
-    if(stat(dir_path, &st) == -1)
-    {
-        mkdir(dir_path, 0700);
-    }
-
     // Adding the specified directory into watch list
     __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MODIFY | IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM);
+
+    // Checking for error
+    if(__inotify_dir_watcher < 0)
+    {
+        log_error("sync", "Could not watch '%s': directory does not exists", dir_path);
+
+        return -1;
+    }
 
     if(pthread_create(&__watcher_thread, NULL, __watcher, NULL) != 0)
     {
@@ -221,4 +220,46 @@ int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
     }
 
     return 0;
+}
+
+/**
+ * List the content of the watched directory
+ *
+ * @return 0 if no errors, -1 otherwise
+ */
+int sync_list_files()
+{
+    DIR *watched_dir;
+    struct dirent *entry;
+    char path[MAX_PATH_LENGTH];
+    MACTimestamp entryMAC;
+
+    watched_dir = opendir(__watched_dir_path);
+
+    if(watched_dir)
+    {
+        while((entry = readdir(watched_dir)) != NULL)
+        {
+            if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            {
+                continue;
+            }
+
+            bzero((void *)path, MAX_PATH_LENGTH);
+            strcat(path, __watched_dir_path);
+            strcat(path, "/");
+            strcat(path, entry->d_name);
+
+            if(file_mac(path, &entryMAC) == 0)
+            {
+                printf("M: %s | A: %s | C: %s | '%s'\n", entryMAC.m, entryMAC.a, entryMAC.c, entry->d_name);
+            }
+        }
+
+        closedir(watched_dir);
+
+        return 0;
+    }
+
+    return -1;
 }

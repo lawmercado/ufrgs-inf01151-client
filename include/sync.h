@@ -1,5 +1,5 @@
-#ifndef __SYNC___
-#define __SYNC___
+#ifndef __SYNC_H___
+#define __SYNC_H___
 
 /**
  * Initializes the synchronization in the specified directory to be synchronized
@@ -24,5 +24,12 @@ void sync_stop();
  * @return 0 if no errors, -1 otherwise
  */
 int sync_update_file(char *name, char *buffer, int length);
+
+/**
+ * List the content of the watched directory
+ *
+ * @return 0 if no errors, -1 otherwise
+ */
+int sync_list_files();
 
 #endif

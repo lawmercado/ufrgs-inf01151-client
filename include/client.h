@@ -1,5 +1,5 @@
-#ifndef __CLIENT___
-#define __CLIENT___
+#ifndef __CLIENT_H___
+#define __CLIENT_H___
 
 #define MAX_INPUT_LENGTH 400
 #define MAX_COMMAND_LENGTH 12
