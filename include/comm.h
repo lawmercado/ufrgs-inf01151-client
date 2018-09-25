@@ -1,6 +1,6 @@
-#ifndef COMMUNICATION_H_
+#ifndef __COMM_H__
 
-#define COMMUNICATION_H_
+#define __COMM_H__
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -43,7 +43,22 @@ int send_packet();
 int receive_packet();
 
 int login(char *host, char *port);
- 
+
 int logout(int sockfd);
+
+#define COMM_PPAYLOAD_LENGTH 256
+#define COMM_PTYPE_DATA 0
+#define COMM_PTYPE_CMD 1
+#define COMM_PTYPE_ACK 2
+
+struct comm_packet {
+    uint16_t type; // Packet type (COMM_PTYPE_*)
+    uint16_t seqn; // Sequence number
+    uint32_t total_size; // Number of fragments
+    uint16_t length; // Payload length
+    char payload[COMM_PPAYLOAD_LENGTH];
+};
+
+int comm_init(char* username, char *host, char* port);
 
 #endif

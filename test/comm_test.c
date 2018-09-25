@@ -3,10 +3,9 @@
 int main(int argc, char *argv[])
 {
 	if(argc != 3){
-    	fprintf(stderr, "Usage: client host port\n");
+    	fprintf(stderr, "Usage: ./client username host port\n");
     	exit(1);
   	}
-    
-    int sockfd = login(argv[1], argv[2]);
-	logout(sockfd);
+
+    printf("COMM INIT %d\n", comm_init(argv[1], argv[2], argv[3]));
 }

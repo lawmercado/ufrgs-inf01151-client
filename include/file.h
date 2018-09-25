@@ -1,5 +1,5 @@
-#ifndef __FILE_H___
-#define __FILE_H___
+#ifndef __FILE_H__
+#define __FILE_H__
 
 #define MAX_FILENAME_LENGTH 255
 #define MAX_PATH_LENGTH 4096

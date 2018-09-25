@@ -1,5 +1,5 @@
-#ifndef __SYNC_H___
-#define __SYNC_H___
+#ifndef __SYNC_H__
+#define __SYNC_H__
 
 /**
  * Initializes the synchronization in the specified directory to be synchronized
