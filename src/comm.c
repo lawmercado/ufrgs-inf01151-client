@@ -346,11 +346,11 @@ int __login(char* username, struct sockaddr_in *tmp_server_address)
     return -1;
 }
 
-int comm_init(char* username, char *host, char* port)
+int comm_init(char* username, char *host, int port)
 {
     struct sockaddr_in tmp_server_address;
 	struct hostent *hostent;
-    int tmp_port = atoi(port);
+    int tmp_port = port;
     int new_port;
 
     if((__socket_instance = socket(AF_INET, SOCK_DGRAM, 0)) == -1)

@@ -7,5 +7,5 @@ int main(int argc, char *argv[])
     	exit(1);
   	}
 
-    printf("COMM INIT %d\n", comm_init(argv[1], argv[2], argv[3]));
+    printf("COMM INIT %d\n", comm_init(argv[1], argv[2], atoi(argv[3])));
 }

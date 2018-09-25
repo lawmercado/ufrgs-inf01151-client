@@ -65,6 +65,6 @@ struct comm_packet {
     char payload[COMM_PPAYLOAD_LENGTH];
 };
 
-int comm_init(char* username, char *host, char* port);
+int comm_init(char* username, char *host, int port);
 
 #endif
