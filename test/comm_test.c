@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[])
 {
-	if(argc != 3){
+	if(argc != 4){
     	fprintf(stderr, "Usage: ./client username host port\n");
     	exit(1);
   	}

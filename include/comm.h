@@ -52,6 +52,7 @@ int login(char *host, char *port);
 
 int logout(int sockfd);
 
+#define COMM_TIMEOUT 5000
 #define COMM_PPAYLOAD_LENGTH 256
 #define COMM_PTYPE_DATA 0
 #define COMM_PTYPE_CMD 1

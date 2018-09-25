@@ -1,3 +1,4 @@
+#include <poll.h>
 #include "comm.h"
 #include "log.h"
 
@@ -185,22 +186,46 @@ int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *pa
     }*/
 
     int status;
-    struct sockaddr from;
-    socklen_t from_length;
+    struct sockaddr_in from;
+    socklen_t from_length = sizeof(struct sockaddr_in);
+    struct pollfd fd;
+    int res;
 
-    // Receives an ack from the server
-    status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
+    fd.fd = __socket_instance;
+    fd.events = POLLIN;
 
-    if(status < 0)
+    res = poll(&fd, 1, COMM_TIMEOUT);
+
+    if(res == 0)
     {
+        log_error("comm", "Connection timed out");
+
         return -1;
     }
+    else if(res == -1)
+    {
+        log_error("comm", "Polling error");
 
-    return 0;
+        return -1;
+    }
+    else
+    {
+        // Receives an ack from the server
+        status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
+
+        if(status < 0)
+        {
+            return -1;
+        }
+
+        return 0;
+    }
 }
 
 int __send_ack(struct sockaddr_in *server_sockaddr)
 {
+    log_debug("comm", "Sending ack");
+
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_ACK;
@@ -218,6 +243,8 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
 
 int __receive_ack(struct sockaddr_in *server_sockaddr)
 {
+    log_debug("comm", "Receiving ack");
+
     struct comm_packet packet;
 
     if(__receive_packet(server_sockaddr, &packet) != 0)
@@ -239,6 +266,8 @@ int __receive_ack(struct sockaddr_in *server_sockaddr)
 
 int __send_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
+    log_debug("comm", "Sending data");
+
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_DATA;
@@ -258,6 +287,8 @@ int __send_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_L
 
 int __receive_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
+    log_debug("comm", "Receiving data");
+
     struct comm_packet packet;
 
     if(__receive_packet(server_sockaddr, &packet) != 0)
@@ -282,6 +313,8 @@ int __receive_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
 
 int __send_command(struct sockaddr_in *server_sockaddr, char command[COMM_PPAYLOAD_LENGTH])
 {
+    log_debug("comm", "Sending command");
+
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_CMD;
@@ -301,6 +334,8 @@ int __send_command(struct sockaddr_in *server_sockaddr, char command[COMM_PPAYLO
 
 int __receive_command(struct sockaddr_in *server_sockaddr, char command[COMM_PPAYLOAD_LENGTH])
 {
+    log_debug("comm", "Receiving command");
+
     struct comm_packet packet;
 
     if(__receive_packet(server_sockaddr, &packet) != 0)
