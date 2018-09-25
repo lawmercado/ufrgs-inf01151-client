@@ -30,4 +30,12 @@ int file_write_buffer(char path[MAX_PATH_LENGTH], char *buffer, int length);
  */
 int file_mac(char path[MAX_PATH_LENGTH], MACTimestamp *mac);
 
+/**
+ * Gets the file size for the specified file
+ *
+ * @param char* path The path of the file
+ * @return the file size if no errors, -1 otherwise
+ */
+int file_size(char path[MAX_PATH_LENGTH]);
+
 #endif
