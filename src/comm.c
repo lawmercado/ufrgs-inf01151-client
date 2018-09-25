@@ -24,25 +24,24 @@ int __send_packet(int *id_msg, char *buffer, int sockfd, struct sockaddr_in *ser
 
     socklen_t tolen = sizeof(struct sockaddr_in);
 
-	memcpy(packet.buffer, buffer, BUFFER_SIZE);
-	packet.ack = 0;
-	packet.id_msg = *id_msg;
+	while(ack != 1){
 
-	while(packet.ack != 1){
-		status = sendto(sockfd, &packet, sizeof(packet), 0, (const struct sockaddr *) serv, sizeof(struct sockaddr_in));
-		if(status < 0){
+		if(sendto(sockfd, newMsg, sizeof(*newMsg), 0, (const struct sockaddr *) serv, sizeof(struct sockaddr_in)) < 0){
 			printf("\n[Error sendto]: Sending packet fault!\n");
 			return -1;
 		}
 		else{
-			printf("\n[Sendto ok]: Sending packet: socket id: %d, msg id: %d!\n", sockfd, packet.id_msg);
+			printf("\n[Sendto ok]: Sending packet: socket id: %d!\n", sockfd);
 		}
 
-		status = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr *) serv, &tolen);
-		if(status < 2){
+		if(recvfrom(sockfd, newMsg, sizeof(*newMsg), 0, (struct sockaddr *) serv, &tolen) < 2){
 
 			printf("\n[Error recvfrom]: Receiving ack fault!\n");
 			return -2;
+		}
+		else
+		{
+			printf("\n[Recvfrom ok]: Received ack: socket id: %d!\n", sockfd);
 		}
 
 		packet.ack = 1;
@@ -53,14 +52,12 @@ int __send_packet(int *id_msg, char *buffer, int sockfd, struct sockaddr_in *ser
 	printf("Got an ack: %s\n", buffer);
 
 
-	*id_msg = *id_msg +1;
 	return 0;
-
 }
 
 int __receive_packet(int *id_msg, char *buffer, int sockfd, struct sockaddr_in *serv){
-    Frame packet;
-	int status = 0;
+
+    Frame packet;	int status = 0;
 
 	socklen_t fromlen = sizeof(struct sockaddr_in);
 
@@ -97,31 +94,14 @@ int __receive_packet(int *id_msg, char *buffer, int sockfd, struct sockaddr_in *
 
 }
 
-int __send_msg(int sockfd, char buffer[BUFFER_SIZE], struct sockaddr_in serv_addr, struct sockaddr_in from){
+int __send_msg(int sockfd, struct sockaddr_in serv_addr, struct sockaddr_in from){
 
-	int msg_counter = 0;
+	TextMessage newMsg;
 
+	bzero(newMsg.buffer, BUFFER_SIZE);
+	strcpy(newMsg.buffer, "CLIENT COMMUNICATION");
 
-	// FIRST MESSAGE TO SERVER!!
-	bzero(buffer, BUFFER_SIZE);
-	strcpy(buffer, "CLIENT COMMUNICATION");
-	if(__send_packet(&msg_counter, buffer, sockfd, &serv_addr) < 0){
-		printf("\nERROR start sending packet!!\n");
-		return -1;
-	}
-
-
-	//SENDS ID
-	msg_counter = 0;
-	strcpy(buffer, "id client");
-	if(__send_packet(&msg_counter, buffer, sockfd, &serv_addr) < 0){
-		printf("\nERROR start sending packet!!\n");
-		return -1;
-	}
-
-	msg_counter = 0;
-	bzero(buffer, BUFFER_SIZE-1);
-	if(__receive_packet(&msg_counter, buffer, sockfd, &from) < 0){
+	if(__send_packet(&newMsg, sockfd, &serv_addr) < 0){
 		printf("\nERROR start sending packet!!\n");
 		return -1;
 	}
@@ -135,7 +115,6 @@ int login(char *server_raw, char *port_raw){
     int sockfd;
 	struct sockaddr_in serv_addr, from;
 	struct hostent *server;
-	char buffer[BUFFER_SIZE];
 
 	int port = atoi(port_raw);
 
@@ -155,7 +134,7 @@ int login(char *server_raw, char *port_raw){
 
 	__create_socket(&serv_addr, port, server);
 
-	if(__send_msg(sockfd, buffer, serv_addr, from) < 0){
+	if(__send_msg(sockfd, serv_addr, from) < 0){
 		printf("[Error sending message]\n");
 	}
 
