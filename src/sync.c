@@ -169,6 +169,8 @@ int sync_init(char *dir_path)
  */
 void sync_stop()
 {
+    pthread_mutex_lock(&__event_handling_mutex);
+
     while(__is_event_processing)
     {
         pthread_cond_wait(&__events_done_processing, &__event_handling_mutex);

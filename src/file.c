@@ -48,15 +48,33 @@ int file_write_buffer(char path[MAX_PATH_LENGTH], char *buffer, int length)
  */
 int file_mac(char path[MAX_PATH_LENGTH], MACTimestamp *mac)
 {
-    struct stat attrib;
+    struct stat st;
 
-    if(stat(path, &attrib) == 0)
+    if(stat(path, &st) == 0)
     {
-        strftime(mac->m, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&attrib.st_mtime));
-        strftime(mac->a, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&attrib.st_atime));
-        strftime(mac->c, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&attrib.st_ctime));
+        strftime(mac->m, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_mtime));
+        strftime(mac->a, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_atime));
+        strftime(mac->c, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_ctime));
 
         return 0;
+    }
+
+    return -1;
+}
+
+/**
+ * Gets the file size for the specified file
+ *
+ * @param char* path The path of the file
+ * @return the file size if no errors, -1 otherwise
+ */
+int file_size(char path[MAX_PATH_LENGTH])
+{
+    struct stat st;
+
+    if(stat(path, &st) == 0)
+    {
+        return st.st_size;
     }
 
     return -1;
