@@ -1,4 +1,5 @@
 #include "comm.h"
+#include "log.h"
 
 /*int logout(int sockfd){
 
@@ -169,7 +170,7 @@ int __send_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packe
     return 0;
 }
 
-int __receive_packet(struct sockaddr *server_sockaddr, struct comm_packet *packet)
+int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
     /*
     TODO: compare this with the server address to check origin
@@ -201,7 +202,6 @@ int __receive_packet(struct sockaddr *server_sockaddr, struct comm_packet *packe
 int __send_ack(struct sockaddr_in *server_sockaddr)
 {
     struct comm_packet packet;
-    int status;
 
     packet.type = COMM_PTYPE_ACK;
     bzero(packet.payload, COMM_PPAYLOAD_LENGTH);
@@ -240,7 +240,6 @@ int __receive_ack(struct sockaddr_in *server_sockaddr)
 int __send_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
     struct comm_packet packet;
-    int status;
 
     packet.type = COMM_PTYPE_DATA;
     packet.length = strlen(buffer);
@@ -275,7 +274,7 @@ int __receive_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
         return -1;
     }
 
-    bzero(buffer, sizeof(buffer));
+    bzero(buffer, COMM_PPAYLOAD_LENGTH);
     strncpy(buffer, packet.payload, packet.length);
 
     return __send_ack(server_sockaddr);
@@ -284,7 +283,6 @@ int __receive_data(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
 int __send_command(struct sockaddr_in *server_sockaddr, char command[COMM_PPAYLOAD_LENGTH])
 {
     struct comm_packet packet;
-    int status;
 
     packet.type = COMM_PTYPE_CMD;
     packet.length = strlen(command);
@@ -319,7 +317,7 @@ int __receive_command(struct sockaddr_in *server_sockaddr, char command[COMM_PPA
         return -1;
     }
 
-    bzero(command, sizeof(command));
+    bzero(command, COMM_PPAYLOAD_LENGTH);
     strncpy(command, packet.payload, packet.length);
 
     return __send_ack(server_sockaddr);
