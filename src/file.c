@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <dirent.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <string.h>
 #include "file.h"
@@ -81,6 +83,18 @@ int file_size(char path[MAX_PATH_LENGTH])
     return -1;
 }
 
+int file_exists(char path[MAX_PATH_LENGTH])
+{
+    struct stat st;
+
+    return stat(path, &st) == 0;
+}
+
+int file_create_dir(char path[MAX_PATH_LENGTH])
+{
+    return mkdir(path, 0700);
+}
+
 int file_get_name_from_path(char *path, char *filename)
 {
     int i = 0;
@@ -93,6 +107,7 @@ int file_get_name_from_path(char *path, char *filename)
             return 0;
         }
     }
+    
     return -1;
 }
 
@@ -104,4 +119,49 @@ int file_read_bytes(FILE *file, char *buffer, int length)
 int file_write_bytes(FILE *file, char *buffer, int length)
 {
     return fwrite(buffer, sizeof(char), length, file);
+}
+
+int file_clear_dir(char *path)
+{
+    DIR *dir;
+    struct dirent *entry;
+    char entry_path[MAX_PATH_LENGTH];
+
+    dir = opendir(path);
+
+    if(dir)
+    {
+        while((entry = readdir(dir)) != NULL)
+        {
+            if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            {
+                continue;
+            }
+
+            file_path(path, entry->d_name, entry_path, MAX_PATH_LENGTH);
+
+            if(unlink(entry_path) != 0)
+            {
+                return -1;
+            }
+
+        }
+
+        closedir(dir);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+int file_path(char* dir, char* file, char *dest, int length)
+{
+    bzero((void *)dest, length);
+
+    strcat(dest, dir);
+    strcat(dest, "/");
+    strcat(dest, file);
+
+    return 0;
 }

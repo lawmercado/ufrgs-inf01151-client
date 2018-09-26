@@ -120,6 +120,20 @@ void *__watcher()
     pthread_exit(NULL);
 }
 
+int __initialize_dir(char *dir_path)
+{
+    if(file_exists(dir_path))
+    {
+        file_clear_dir(dir_path);
+    }
+    else
+    {
+        file_create_dir(dir_path);
+    }
+
+    return 0;
+}
+
 /**
  * Initializes the synchronization in the specified directory to be synchronized
  *
@@ -128,6 +142,8 @@ void *__watcher()
  */
 int sync_init(char *dir_path)
 {
+    __initialize_dir(dir_path);
+
     __watched_dir_path = dir_path;
 
     __inotify_instance = inotify_init1(IN_NONBLOCK);
@@ -197,15 +213,10 @@ void sync_stop()
  */
 int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
 {
-    char path[MAX_PATH_LENGTH];
-
     sync_stop();
 
-    bzero((void *)path, MAX_PATH_LENGTH);
-
-    strcat(path, __watched_dir_path);
-    strcat(path, "/");
-    strcat(path, name);
+    char path[MAX_PATH_LENGTH];
+    file_path(__watched_dir_path, name, path, MAX_PATH_LENGTH);
 
     if(file_write_buffer(path, buffer, length) != 0)
     {
@@ -247,10 +258,7 @@ int sync_list_files()
                 continue;
             }
 
-            bzero((void *)path, MAX_PATH_LENGTH);
-            strcat(path, __watched_dir_path);
-            strcat(path, "/");
-            strcat(path, entry->d_name);
+            file_path(__watched_dir_path, entry->d_name, path, MAX_PATH_LENGTH);
 
             if(file_mac(path, &entryMAC) == 0)
             {

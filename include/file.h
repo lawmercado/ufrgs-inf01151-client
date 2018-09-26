@@ -38,10 +38,18 @@ int file_mac(char path[MAX_PATH_LENGTH], MACTimestamp *mac);
  */
 int file_size(char path[MAX_PATH_LENGTH]);
 
+int file_exists(char path[MAX_PATH_LENGTH]);
+
+int file_create_dir(char path[MAX_PATH_LENGTH]);
+
 int file_get_name_from_path(char *path, char *filename);
 
 int file_read_bytes(FILE *file, char *buffer, int length);
 
 int file_write_bytes(FILE *file, char *buffer, int length);
+
+int file_clear_dir(char *path);
+
+int file_path(char* dir, char* file, char *dest, int length);
 
 #endif

@@ -8,6 +8,7 @@
 #define COMM_PTYPE_DATA 0
 #define COMM_PTYPE_CMD 1
 #define COMM_PTYPE_ACK 2
+#define COMM_TIMEOUT_ERROR 2
 
 struct comm_packet {
     uint16_t type; // Packet type (COMM_PTYPE_*)
@@ -22,5 +23,7 @@ int comm_init(char* username, char *host, int port);
 int comm_download(char *path);
 
 int comm_upload(char *path);
+
+int comm_stop();
 
 #endif

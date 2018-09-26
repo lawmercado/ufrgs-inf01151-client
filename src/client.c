@@ -8,19 +8,10 @@
 #include "sync.h"
 #include "log.h"
 
-int __setup()
-{
-    if(sync_init("sync_dir") != 0)
-    {
-        return -1;
-    }
-
-    return 0;
-}
-
 int __exit()
 {
     sync_stop();
+    comm_stop();
 
     return 0;
 }
@@ -99,37 +90,42 @@ int main(int argc, char** argv)
 {
     char input[MAX_INPUT_LENGTH];
 
-    if( argc != 3 )
+    if(argc != 4)
     {
-    	log_error("client", "Usage: ./client <host> <port>");
+    	log_error("client", "Usage: ./client <username> <host> <port>");
 
     	exit(1);
   	}
 
-    // TODO: Call __setup and enter this loop only after sucessfull login
-
-    if(__setup() == 0)
+    if(comm_init(argv[1], argv[2], atoi(argv[3])) != 0)
     {
-        do
-        {
-            fgets(input, sizeof(input), stdin);
-
-        } while(__handle_input(input) == 0);
-
-        __exit();
+        exit(1);
     }
+
+    if(sync_init("sync_dir") != 0)
+    {
+        exit(1);
+    }
+
+    do
+    {
+        fgets(input, sizeof(input), stdin);
+
+    } while(__handle_input(input) == 0);
+
+    __exit();
 
     return 0;
 }
 
 void upload(char *file)
 {
-
+    comm_upload(file);
 }
 
 void download(char *file)
 {
-
+    comm_download(file);
 }
 
 void delete(char *file)

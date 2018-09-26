@@ -14,10 +14,10 @@
 
 int __socket_instance;
 struct sockaddr_in __server_sockaddr;
+char* username;
 
-int __login(struct sockaddr_in *tmp_server_address, char* username);
-int upload(char *path);
-int download(char *path);
+int __login(struct sockaddr_in *tmp_sockaddr, char* username);
+int __logout(struct sockaddr_in *tmp_sockaddr);
 
 void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port);
 
@@ -29,10 +29,12 @@ int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
 int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH]);
 int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH]);
+int __send_file(struct sockaddr_in *server_sockaddr, char path[MAX_PATH_LENGTH]);
+int __receive_file(struct sockaddr_in *server_sockaddr, char path[MAX_PATH_LENGTH]);
 
 int comm_init(char* username, char *host, int port)
 {
-    struct sockaddr_in tmp_server_address;
+    struct sockaddr_in tmp_sockaddr;
 	struct hostent *hostent;
     int tmp_port = port;
     int new_port;
@@ -52,9 +54,9 @@ int comm_init(char* username, char *host, int port)
         return -1;
     }
 
-	__server_init_sockaddr(&tmp_server_address, hostent, tmp_port);
+	__server_init_sockaddr(&tmp_sockaddr, hostent, tmp_port);
 
-    new_port = __login(&tmp_server_address, username);
+    new_port = __login(&tmp_sockaddr, username);
 
     if(new_port != -1)
     {
@@ -65,6 +67,91 @@ int comm_init(char* username, char *host, int port)
 
     close(__socket_instance);
     return -1;
+}
+
+int comm_download(char *file)
+{
+    char download_command[COMM_PPAYLOAD_LENGTH];
+
+    sprintf(download_command, "download %s", file);
+
+    if(__send_command(&__server_sockaddr, download_command) == 0)
+    {
+        if(__receive_file(&__server_sockaddr, file) == 0)
+        {
+            log_debug("comm", "'%s' downloaded", file);
+
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int comm_upload(char *path)
+{
+    char upload_command[COMM_PPAYLOAD_LENGTH];
+    char filename[MAX_FILENAME_LENGTH];
+
+    if(file_get_name_from_path(path, filename) == -1)
+    {
+        strcpy(filename, path);
+    }
+
+    sprintf(upload_command, "upload %s", filename);
+
+    if(__send_command(&__server_sockaddr, upload_command) == 0)
+    {
+        if(__send_file(&__server_sockaddr, path) == 0)
+        {
+            log_debug("comm", "'%s' uploaded into '%s'", path, filename);
+        }
+    }
+
+    return -1;
+}
+
+int comm_stop()
+{
+    if(__logout(&__server_sockaddr) == 0)
+    {
+        close(__socket_instance);
+    }
+
+    return -1;
+}
+
+int __login(struct sockaddr_in *tmp_sockaddr, char* username)
+{
+    char login_command[COMM_PPAYLOAD_LENGTH];
+    struct comm_packet packet;
+    int port;
+
+    sprintf(login_command, "login %s", username);
+
+    if(__send_command(tmp_sockaddr, login_command) == 0)
+    {
+        if(__receive_data(tmp_sockaddr, &packet) == 0)
+        {
+            port = atoi(packet.payload);
+
+            log_debug("comm", "Client port %d", port);
+
+            return port;
+        }
+    }
+
+    return -1;
+}
+
+int __logout(struct sockaddr_in *sockaddr)
+{
+    char logout_command[COMM_PPAYLOAD_LENGTH];
+
+    bzero(logout_command, COMM_PPAYLOAD_LENGTH);
+    sprintf(logout_command, "logout");
+
+    return __send_command(sockaddr, logout_command);
 }
 
 void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port)
@@ -118,7 +205,7 @@ int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *pa
     {
         log_error("comm", "Connection timed out");
 
-        return -1;
+        return COMM_TIMEOUT_ERROR;
     }
     else if(res == -1)
     {
@@ -148,6 +235,9 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
 
     packet.type = COMM_PTYPE_ACK;
     bzero(packet.payload, COMM_PPAYLOAD_LENGTH);
+    packet.seqn = 0;
+    packet.length = 0;
+    packet.total_size = 1;
 
     if(__send_packet(server_sockaddr, &packet) != 0)
     {
@@ -227,6 +317,8 @@ int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
 
     packet.type = COMM_PTYPE_CMD;
     packet.length = strlen(buffer);
+    packet.seqn = 0;
+    packet.total_size = 1;
     bzero(packet.payload, COMM_PPAYLOAD_LENGTH);
     strncpy(packet.payload, buffer, strlen(buffer));
 
@@ -264,39 +356,6 @@ int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAY
     strncpy(buffer, packet.payload, packet.length);
 
     return __send_ack(server_sockaddr);
-}
-
-int __login(struct sockaddr_in *tmp_server_address, char* username)
-{
-    char login_command[COMM_PPAYLOAD_LENGTH];
-    struct comm_packet packet;
-    int port;
-
-    sprintf(login_command, "login %s", username);
-
-    if(__send_command(tmp_server_address, login_command) == 0)
-    {
-        if(__receive_data(tmp_server_address, &packet) == 0)
-        {
-            port = atoi(packet.payload);
-
-            log_debug("comm", "Client port %d", port);
-
-            return port;
-        }
-    }
-
-    return -1;
-}
-
-int __get_file_datagram(FILE *f, char *payload)
-{
-    return fread(payload, COMM_PPAYLOAD_LENGTH, 1, f);
-}
-
-int __read_payload(FILE *file, char *payload, int length)
-{
-    return fread(payload, sizeof(char), length, file);
 }
 
 int __send_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
@@ -363,43 +422,6 @@ int __receive_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
     }
 
     fclose(file);
-
-    return -1;
-}
-
-int comm_download(char *path)
-{
-    char download_command[COMM_PPAYLOAD_LENGTH];
-
-    sprintf(download_command, "download %s", path);
-
-    if(__send_command(&__server_sockaddr, download_command) == 0)
-    {
-        if(__receive_file(&__server_sockaddr, path) == 0)
-        {
-            log_debug("comm", "Downloaded.");
-        }
-    }
-
-    return -1;
-}
-
-int comm_upload(char *path)
-{
-    char upload_command[COMM_PPAYLOAD_LENGTH];
-    char filename[MAX_FILENAME_LENGTH];
-
-    file_get_name_from_path(path, filename);
-
-    sprintf(upload_command, "upload %s", filename);
-
-    if(__send_command(&__server_sockaddr, upload_command) == 0)
-    {
-        if(__send_file(&__server_sockaddr, path) == 0)
-        {
-            log_debug("comm", "Uploaded.");
-        }
-    }
 
     return -1;
 }
