@@ -15,9 +15,9 @@
 int __socket_instance;
 struct sockaddr_in __server_sockaddr;
 
-int __login(char* username, struct sockaddr_in *tmp_server_address);
-int __upload(char* path);
-int __download(char* path);
+int __login(struct sockaddr_in *tmp_server_address, char* username);
+int __upload(struct sockaddr_in *server_address, char *path);
+int __download(struct sockaddr_in *server_address, char *path);
 
 void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port);
 
@@ -54,7 +54,7 @@ int comm_init(char* username, char *host, int port)
 
 	__server_init_sockaddr(&tmp_server_address, hostent, tmp_port);
 
-    new_port = __login(username, &tmp_server_address);
+    new_port = __login(&tmp_server_address, username);
 
     if(new_port != -1)
     {
@@ -266,7 +266,7 @@ int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAY
     return __send_ack(server_sockaddr);
 }
 
-int __login(char* username, struct sockaddr_in *tmp_server_address)
+int __login(struct sockaddr_in *tmp_server_address, char* username)
 {
     char login_command[COMM_PPAYLOAD_LENGTH];
     struct comm_packet packet;
@@ -348,4 +348,40 @@ int __receive_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
     file_write_buffer(path, buffer, sizeof(buffer));
 
     return 0;
+}
+
+int __download(struct sockaddr_in *server_address, char *path)
+{
+    char download_command[COMM_PPAYLOAD_LENGTH];
+    char buffer[COMM_PPAYLOAD_LENGTH];
+
+    sprintf(download_command, "download %s", path);
+
+    if(__send_command(server_address, download_command) == 0)
+    {
+        if(__receive_file(server_address, buffer) == 0)
+        {
+            log_debug("comm", "Downloaded.");
+        }
+    }
+
+    return -1;
+}
+
+int __upload(struct sockaddr_in *server_address, char *path)
+{
+    char upload_command[COMM_PPAYLOAD_LENGTH];
+    char buffer[COMM_PPAYLOAD_LENGTH];
+
+    sprintf(upload_command, "upload %s", path);
+
+    if(__send_command(server_address, upload_command) == 0)
+    {
+        if(__send_file(server_address, buffer) == 0)
+        {
+            log_debug("comm", "Uploaded.");
+        }
+    }
+
+    return -1;
 }

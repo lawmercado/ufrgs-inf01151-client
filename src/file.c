@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <string.h>
 #include "file.h"
 #include "log.h"
 
@@ -77,5 +78,20 @@ int file_size(char path[MAX_PATH_LENGTH])
         return st.st_size;
     }
 
+    return -1;
+}
+
+int file_get_name_from_path(char *path, char *filename)
+{
+    int i = 0;
+    for(i = strlen(path); i != 0; i--)
+    {
+        if (path[i] == '/')
+        {
+            strncpy(filename, path+i+1, ((strlen(path)-i)+1));
+            printf("%s\n", filename);
+            return 0;
+        }
+    }
     return -1;
 }
