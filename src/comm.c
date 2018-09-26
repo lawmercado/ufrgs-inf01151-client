@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <poll.h>
+#include <math.h>
 #include "comm.h"
 #include "log.h"
 #include "file.h"
@@ -185,12 +186,9 @@ int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
     log_debug("comm", "Sending data");
 
-    struct comm_packet packet;
-
     packet->type = COMM_PTYPE_DATA;
-    bzero(packet->payload, COMM_PPAYLOAD_LENGTH);
 
-    if(__send_packet(server_sockaddr, &packet) != 0)
+    if(__send_packet(server_sockaddr, packet) != 0)
     {
         log_error("comm", "Data could not be sent");
 
@@ -203,7 +201,6 @@ int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
     log_debug("comm", "Receiving data");
-
 
     if(__receive_packet(server_sockaddr, packet) != 0)
     {
@@ -325,7 +322,7 @@ int __send_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
         __send_data(sockaddr, &packet);
     }
 
-	
+
 	fclose(f);
     return 0;
 }
