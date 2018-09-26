@@ -3,7 +3,7 @@
 
 #include <netdb.h>
 
-#define COMM_TIMEOUT 5000
+#define COMM_TIMEOUT 20000
 #define COMM_PPAYLOAD_LENGTH 256
 #define COMM_PTYPE_DATA 0
 #define COMM_PTYPE_CMD 1
@@ -18,5 +18,9 @@ struct comm_packet {
 };
 
 int comm_init(char* username, char *host, int port);
+
+int comm_download(char *path);
+
+int comm_upload(char *path);
 
 #endif

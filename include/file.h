@@ -40,5 +40,8 @@ int file_size(char path[MAX_PATH_LENGTH]);
 
 int file_get_name_from_path(char *path, char *filename);
 
+int file_read_bytes(FILE *file, char *buffer, int length);
+
+int file_write_bytes(FILE *file, char *buffer, int length);
 
 #endif

@@ -16,8 +16,8 @@ int __socket_instance;
 struct sockaddr_in __server_sockaddr;
 
 int __login(struct sockaddr_in *tmp_server_address, char* username);
-int __upload(struct sockaddr_in *server_address, char *path);
-int __download(struct sockaddr_in *server_address, char *path);
+int upload(char *path);
+int download(char *path);
 
 void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port);
 
@@ -294,72 +294,88 @@ int __get_file_datagram(FILE *f, char *payload)
     return fread(payload, COMM_PPAYLOAD_LENGTH, 1, f);
 }
 
+int __read_payload(FILE *file, char *payload, int length)
+{
+    return fread(payload, sizeof(char), length, file);
+}
+
 int __send_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
 {
+    FILE *file = NULL;
     int i;
-	long fileSize = 0;
-    FILE *f;
 
-	if ((fileSize = file_size(path)) < 0)
-	{
-		printf("ERROR: invalid file size");
-	}
+    file = fopen(path, "rb");
 
-    f = fopen (path, "rb");
+    if(file == NULL)
+    {
+        log_error("comm", "Could not open the file in '%s'", path);
 
-    int NUM_PACKETS = (int) ceil( ( (float) fileSize) / (float) COMM_PPAYLOAD_LENGTH);
+        return -1;
+    }
+
+    int num_packets = (int) ceil(file_size(path) / (float) COMM_PPAYLOAD_LENGTH);
 
     struct comm_packet packet;
 
-    for(i = 0; i < NUM_PACKETS; i++)
+    for(i = 0; i < num_packets; i++)
     {
-        int length = __get_file_datagram(f, packet.payload);
+        int length = file_read_bytes(file, packet.payload, COMM_PPAYLOAD_LENGTH);
 
         packet.length = length;
-        packet.total_size = NUM_PACKETS;
+        packet.total_size = num_packets;
         packet.seqn = i;
 
         __send_data(sockaddr, &packet);
     }
 
-
-	fclose(f);
+    fclose(file);
     return 0;
 }
 
 int __receive_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
 {
-
+    FILE *file = NULL;
+    int i;
     struct comm_packet packet;
-    __receive_data(sockaddr, &packet);
 
-    char *buffer = (char *) calloc (packet.total_size * COMM_PPAYLOAD_LENGTH, sizeof(char));
+    file = fopen(path, "wb");
 
-
-    int i = 0, length = 0;
-    while(i < packet.total_size)
+    if(file == NULL)
     {
-        length += packet.length;
-        strcat(buffer, packet.payload);
-        __receive_data(sockaddr, &packet);
-        i++;
+        log_error("comm", "Could not open the file in '%s'", path);
+
+        return -1;
     }
 
-    file_write_buffer(path, buffer, sizeof(buffer));
+    if(__receive_data(sockaddr, &packet) == 0)
+    {
+        file_write_bytes(file, packet.payload, packet.length);
 
-    return 0;
+        for(i = 1; i < packet.total_size; i++)
+        {
+            __receive_data(sockaddr, &packet);
+            file_write_bytes(file, packet.payload, packet.length);
+        }
+
+        fclose(file);
+
+        return 0;
+    }
+
+    fclose(file);
+
+    return -1;
 }
 
-int __download(struct sockaddr_in *server_address, char *path)
+int comm_download(char *path)
 {
     char download_command[COMM_PPAYLOAD_LENGTH];
-    char buffer[COMM_PPAYLOAD_LENGTH];
 
     sprintf(download_command, "download %s", path);
 
-    if(__send_command(server_address, download_command) == 0)
+    if(__send_command(&__server_sockaddr, download_command) == 0)
     {
-        if(__receive_file(server_address, buffer) == 0)
+        if(__receive_file(&__server_sockaddr, path) == 0)
         {
             log_debug("comm", "Downloaded.");
         }
@@ -368,16 +384,18 @@ int __download(struct sockaddr_in *server_address, char *path)
     return -1;
 }
 
-int __upload(struct sockaddr_in *server_address, char *path)
+int comm_upload(char *path)
 {
     char upload_command[COMM_PPAYLOAD_LENGTH];
-    char buffer[COMM_PPAYLOAD_LENGTH];
+    char filename[MAX_FILENAME_LENGTH];
 
-    sprintf(upload_command, "upload %s", path);
+    file_get_name_from_path(path, filename);
 
-    if(__send_command(server_address, upload_command) == 0)
+    sprintf(upload_command, "upload %s", filename);
+
+    if(__send_command(&__server_sockaddr, upload_command) == 0)
     {
-        if(__send_file(server_address, buffer) == 0)
+        if(__send_file(&__server_sockaddr, path) == 0)
         {
             log_debug("comm", "Uploaded.");
         }
