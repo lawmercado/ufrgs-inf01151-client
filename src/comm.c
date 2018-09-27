@@ -12,6 +12,8 @@
 #include "log.h"
 #include "file.h"
 
+#include <dirent.h> 
+
 int __socket_instance;
 struct sockaddr_in __server_sockaddr;
 char* username;
@@ -67,6 +69,34 @@ int comm_init(char* username, char *host, int port)
 
     close(__socket_instance);
     return -1;
+}
+
+int comm_list_server()
+{
+    char list_server_command[12] = "list_server";
+
+    if(__send_command(&__server_sockaddr, list_server_command) == 0)
+    {
+        log_debug("comm", "send to list sv ok");
+
+        char temp_file[MAX_FILENAME_LENGTH];
+
+        strcat(temp_file, "temp.txt");
+
+        if(__receive_file(&__server_sockaddr, temp_file) == 0)
+        {
+            log_debug("comm", "'%s' downloaded", temp_file);
+
+            file_print(temp_file);
+
+            file_delete(temp_file);
+
+            return 0;
+        }
+
+    }
+
+    return 0;
 }
 
 int comm_download(char *file)

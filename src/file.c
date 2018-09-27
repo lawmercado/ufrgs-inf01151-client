@@ -121,6 +121,11 @@ int file_write_bytes(FILE *file, char *buffer, int length)
     return fwrite(buffer, sizeof(char), length, file);
 }
 
+int file_delete(char path[MAX_PATH_LENGTH])
+{
+    return remove(path);
+}
+
 int file_clear_dir(char *path)
 {
     DIR *dir;
@@ -164,4 +169,20 @@ int file_path(char* dir, char* file, char *dest, int length)
     strcat(dest, file);
 
     return 0;
+}
+
+int file_print(char *path)
+{
+
+    FILE *file = NULL;
+
+    file = fopen(path, "rb");
+    FILE_TEMP file_temp;
+
+    while(fread(&file_temp, sizeof(file_temp), 1, file) == 1)
+    {
+        printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
+    }
+
+
 }

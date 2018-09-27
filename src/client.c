@@ -135,7 +135,7 @@ void delete(char *file)
 
 void list_server()
 {
-
+    comm_list_server();
 }
 
 void list_client()
