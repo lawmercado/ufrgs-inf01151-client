@@ -184,5 +184,7 @@ int file_print(char *path)
         printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
     }
 
+    return 0;
+
 
 }

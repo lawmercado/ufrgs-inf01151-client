@@ -24,6 +24,8 @@ int comm_download(char *path);
 
 int comm_upload(char *path);
 
+int comm_list_server();
+
 int comm_stop();
 
 #endif
