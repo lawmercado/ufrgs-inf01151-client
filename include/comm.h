@@ -26,6 +26,8 @@ int comm_upload(char *path);
 
 int comm_list_server();
 
+int comm_get_sync_dir();
+
 int comm_stop();
 
 #endif
