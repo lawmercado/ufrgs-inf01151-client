@@ -124,7 +124,7 @@ int __initialize_dir(char *dir_path)
 {
     if(file_exists(dir_path))
     {
-        file_clear_dir(dir_path);
+        file_clear_dir(dir_path);     
     }
     else
     {
@@ -144,6 +144,11 @@ int sync_init(char *dir_path)
 {
     __initialize_dir(dir_path);
 
+    return 0;
+}
+
+int watch_sync_init(char *dir_path)
+{
     __watched_dir_path = dir_path;
 
     __inotify_instance = inotify_init1(IN_NONBLOCK);

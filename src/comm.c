@@ -71,6 +71,61 @@ int comm_init(char* username, char *host, int port)
     return -1;
 }
 
+int __comm_download_all_dir(char * temp_file)
+{
+    log_debug("comm", "entrou no download all dir!");
+
+    FILE *fp;
+    char str[60];
+
+    /* opening file for reading */
+    fp = fopen(temp_file , "r");
+    if(fp == NULL) {
+      perror("Error opening file");
+      return(-1);
+    }
+
+    while(fgets (str, FILENAME_MAX, fp)!=NULL ) 
+    {
+      log_debug("comm", "Arquivo a ser baixado: %s\n", str);
+
+      comm_download(str);
+    }
+    fclose(fp);
+
+    return 0;
+   
+}
+
+int comm_get_sync_dir()
+{
+    char get_sync_dir_command[12] = "get_sync_dir";
+
+    if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
+    {
+        log_error("comm", "send command get_sync_dir error!");
+    }
+    else
+    {
+
+        char temp_file[MAX_FILENAME_LENGTH];
+        strcat(temp_file, "temp.txt");
+        
+        if(__receive_file(&__server_sockaddr, temp_file) == 0)
+        {
+            log_debug("comm", "'%s' downloaded", temp_file);
+
+            __comm_download_all_dir(temp_file);
+
+            file_delete(temp_file);
+
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
 int comm_list_server()
 {
     char list_server_command[12] = "list_server";

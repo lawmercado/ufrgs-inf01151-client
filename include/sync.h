@@ -9,6 +9,8 @@
  */
 int sync_init(char *dir_path);
 
+int watch_sync_init(char *dir_path);
+
 /**
  * Stop the synchronization process
  *

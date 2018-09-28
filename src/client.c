@@ -102,9 +102,20 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+
     if(sync_init("sync_dir") != 0)
     {
         exit(1);
+    }
+    else
+    {
+
+        //get_sync_dir();
+
+        if(watch_sync_init("sync_dir") != 0)
+        {
+            exit(1);
+        }
     }
 
     do
@@ -145,5 +156,5 @@ void list_client()
 
 void get_sync_dir()
 {
-
+    comm_get_sync_dir();
 }
