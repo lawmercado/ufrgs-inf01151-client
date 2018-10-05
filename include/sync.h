@@ -1,21 +1,21 @@
 #ifndef __SYNC_H__
 #define __SYNC_H__
 
+int sync_init(char *dir_path);
+
 /**
  * Initializes the synchronization in the specified directory to be synchronized
  *
  * @param char* dir_path The directory to be synchronized
  * @return 0 if no errors, -1 otherwise
  */
-int sync_init(char *dir_path);
-
-int watch_sync_init(char *dir_path);
+int sync_watcher_init(char *dir_path);
 
 /**
  * Stop the synchronization process
  *
  */
-void sync_stop();
+void sync_watcher_stop();
 
 /**
  * Updates the file in the synchronized directory

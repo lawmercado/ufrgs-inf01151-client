@@ -6,6 +6,8 @@ int main(int argc, char** argv)
 {
     if( sync_init("sync_dir") == 0 )
     {
+        sync_watcher_init("sync_dir");
+
         sleep(20);
 
         sync_list_files();
@@ -14,6 +16,6 @@ int main(int argc, char** argv)
 
         sync_list_files();
 
-        sync_stop();
+        sync_watcher_stop();
     }
 }

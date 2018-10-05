@@ -12,7 +12,7 @@
 #include "log.h"
 #include "file.h"
 
-#include <dirent.h> 
+#include <dirent.h>
 
 int __socket_instance;
 struct sockaddr_in __server_sockaddr;
@@ -83,34 +83,33 @@ int __comm_download_all_dir(char * temp_file)
       return(-1);
     }
 
-    while(fgets (str, FILENAME_MAX, fp)!=NULL ) 
+    while(fgets(str, FILENAME_MAX, fp)!=NULL )
     {
-      
-      str[strlen(str) - 1] = '\0';
+        if(str[strlen(str) - 1] == '\n')
+        {
+            str[strlen(str) - 1] = '\0';
+        }
 
       log_debug("comm", "Starting '%s' download...", str);
 
       if(strcmp(str, "DiretorioVazio") == 0)
       {
-          printf("\t!!! EMPTY DIR !!!\n\n");
           printf("Empty dir: Nothing to download and sync...\n");
           file_delete(str);
           return 0;
       }
 
-      comm_download(str);
+      comm_download(str, "./sync_dir");
     }
     fclose(fp);
 
     return 0;
-   
+
 }
 
 int comm_get_sync_dir()
 {
-    fprintf(stderr, "Starting operation 'get_sync_dir'...\n");
-
-    char get_sync_dir_command[12] = "get_sync_dir";
+    char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
 
     if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
     {
@@ -118,10 +117,9 @@ int comm_get_sync_dir()
     }
     else
     {
-
         char temp_file[MAX_FILENAME_LENGTH];
         strcat(temp_file, "temp.txt");
-        
+
         if(__receive_file(&__server_sockaddr, temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
@@ -130,56 +128,60 @@ int comm_get_sync_dir()
 
             file_delete(temp_file);
 
-            fprintf(stderr, "Ending operation 'get_sync_dir'...\n");
             return 0;
         }
     }
 
-    fprintf(stderr, "Ending operation 'get_sync_dir'...\n");
     return 0;
 }
 
 int comm_list_server()
 {
-    fprintf(stderr, "Starting operation 'list_server'...\n");
-
-    char list_server_command[12] = "list_server";
+    char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
 
     if(__send_command(&__server_sockaddr, list_server_command) == 0)
     {
-        log_debug("comm", "Send and Receive packet for list_server OK!");
-
-        char temp_file[MAX_FILENAME_LENGTH];
-
-        strcat(temp_file, "temp.txt");
+        char temp_file[MAX_FILENAME_LENGTH] = "temp.txt";
 
         if(__receive_file(&__server_sockaddr, temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
-            file_print(temp_file);
+            FILE *file = NULL;
+
+            file = fopen(temp_file, "rb");
+            FILE_TEMP file_temp;
+
+            while(fread(&file_temp, sizeof(file_temp), 1, file) == 1)
+            {
+                if(strcmp(file_temp.file_name, "DiretorioVazio") != 0)
+                {
+                    printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
+                }
+            }
 
             file_delete(temp_file);
 
-            fprintf(stderr, "Ending operation 'list_server'...\n");
             return 0;
         }
-
     }
 
-    fprintf(stderr, "Ending operation 'list_server'...\n");
     return 0;
 }
 
-int comm_download(char *file)
+int comm_download(char *file, char *dest)
 {
     char download_command[COMM_PPAYLOAD_LENGTH];
 
     sprintf(download_command, "download %s", file);
 
+    char path[MAX_PATH_LENGTH];
+
+    file_path(dest, file, path, MAX_PATH_LENGTH);
+
     if(__send_command(&__server_sockaddr, download_command) == 0)
     {
-        if(__receive_file(&__server_sockaddr, file) == 0)
+        if(__receive_file(&__server_sockaddr, path) == 0)
         {
             log_debug("comm", "'%s' downloaded", file);
 

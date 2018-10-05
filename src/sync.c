@@ -8,6 +8,7 @@
 #include "sync.h"
 #include "file.h"
 #include "log.h"
+#include "comm.h"
 
 #define EVENT_SIZE (sizeof (struct inotify_event))
 #define EVENT_BUF_LEN (1024 * (EVENT_SIZE + 16))
@@ -124,11 +125,21 @@ int __initialize_dir(char *dir_path)
 {
     if(file_exists(dir_path))
     {
-        file_clear_dir(dir_path);     
+        file_clear_dir(dir_path);
     }
     else
     {
         file_create_dir(dir_path);
+    }
+
+    return 0;
+}
+
+int sync_init(char *dir_path)
+{
+    if(__initialize_dir(dir_path) == 0)
+    {
+        comm_get_sync_dir();
     }
 
     return 0;
@@ -140,14 +151,7 @@ int __initialize_dir(char *dir_path)
  * @param char* dir_path The directory to be synchronized
  * @return 0 if no errors, -1 otherwise
  */
-int sync_init(char *dir_path)
-{
-    __initialize_dir(dir_path);
-
-    return 0;
-}
-
-int watch_sync_init(char *dir_path)
+int sync_watcher_init(char *dir_path)
 {
     __watched_dir_path = dir_path;
 
@@ -188,7 +192,7 @@ int watch_sync_init(char *dir_path)
  * Stop the synchronization process
  *
  */
-void sync_stop()
+void sync_watcher_stop()
 {
     pthread_mutex_lock(&__event_handling_mutex);
 
@@ -218,7 +222,7 @@ void sync_stop()
  */
 int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
 {
-    sync_stop();
+    sync_watcher_stop();
 
     char path[MAX_PATH_LENGTH];
     file_path(__watched_dir_path, name, path, MAX_PATH_LENGTH);
@@ -230,7 +234,7 @@ int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
         return -1;
     }
 
-    if(sync_init(__watched_dir_path) != 0)
+    if(sync_watcher_init(__watched_dir_path) != 0)
     {
         log_error("sync", "Could not initialize the synchronization process");
 

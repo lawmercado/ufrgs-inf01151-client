@@ -11,6 +11,4 @@ int main(int argc, char *argv[])
   	}
 
 	printf("COMM INIT %d\n", comm_init(argv[1], argv[2], atoi(argv[3])));
-
-    comm_download("etapa2.tgz");
 }

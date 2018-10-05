@@ -10,7 +10,7 @@
 
 int __exit()
 {
-    sync_stop();
+    sync_watcher_stop();
     comm_stop();
 
     return 0;
@@ -103,22 +103,17 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-
-
     if(sync_init("sync_dir") != 0)
     {
         exit(1);
     }
     else
     {
-        if(watch_sync_init("sync_dir") != 0)
+        if(sync_watcher_init("sync_dir") != 0)
         {
             exit(1);
         }
-
     }
-    
-    //get_sync_dir();
 
     do
     {
@@ -139,7 +134,7 @@ void upload(char *file)
 
 void download(char *file)
 {
-    comm_download(file);
+    comm_download(file, ".");
 }
 
 void delete(char *file)
@@ -159,5 +154,7 @@ void list_client()
 
 void get_sync_dir()
 {
+    sync_watcher_stop();
     comm_get_sync_dir();
+    sync_watcher_init("sync_dir");
 }

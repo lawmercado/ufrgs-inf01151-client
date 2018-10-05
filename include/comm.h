@@ -20,7 +20,7 @@ struct comm_packet {
 
 int comm_init(char* username, char *host, int port);
 
-int comm_download(char *path);
+int comm_download(char *file, char *dest);
 
 int comm_upload(char *path);
 
