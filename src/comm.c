@@ -73,8 +73,6 @@ int comm_init(char* username, char *host, int port)
 
 int __comm_download_all_dir(char * temp_file)
 {
-    log_debug("comm", "entrou no download all dir!");
-
     FILE *fp;
     char str[60];
 
@@ -89,6 +87,14 @@ int __comm_download_all_dir(char * temp_file)
     {
       log_debug("comm", "Arquivo a ser baixado: %s\n", str);
 
+      if(strcmp(str, "DiretorioVazio") == 0)
+      {
+          printf("\t!!! EMPTY DIR !!!\n\n");
+          printf("Empty dir: Nothing to download and sync...\n");
+          file_delete(str);
+          return 0;
+      }
+
       comm_download(str);
     }
     fclose(fp);
@@ -99,6 +105,8 @@ int __comm_download_all_dir(char * temp_file)
 
 int comm_get_sync_dir()
 {
+    fprintf(stderr, "Starting operation 'get_sync_dir'...\n");
+
     char get_sync_dir_command[12] = "get_sync_dir";
 
     if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
@@ -119,20 +127,24 @@ int comm_get_sync_dir()
 
             file_delete(temp_file);
 
+            fprintf(stderr, "Ending operation 'get_sync_dir'...\n");
             return 0;
         }
     }
 
+    fprintf(stderr, "Ending operation 'get_sync_dir'...\n");
     return 0;
 }
 
 int comm_list_server()
 {
+    fprintf(stderr, "Starting operation 'list_server'...\n");
+
     char list_server_command[12] = "list_server";
 
     if(__send_command(&__server_sockaddr, list_server_command) == 0)
     {
-        log_debug("comm", "send to list sv ok");
+        log_debug("comm", "Send and Receive packet for list_server OK!");
 
         char temp_file[MAX_FILENAME_LENGTH];
 
@@ -146,11 +158,13 @@ int comm_list_server()
 
             file_delete(temp_file);
 
+            fprintf(stderr, "Ending operation 'list_server'...\n");
             return 0;
         }
 
     }
 
+    fprintf(stderr, "Ending operation 'list_server'...\n");
     return 0;
 }
 
@@ -391,6 +405,7 @@ int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *pack
         return -1;
     }
 
+
     return __send_ack(server_sockaddr);
 }
 
@@ -413,6 +428,7 @@ int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
 
         return -1;
     }
+
 
     return __receive_ack(server_sockaddr);
 }

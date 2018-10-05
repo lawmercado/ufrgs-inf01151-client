@@ -18,6 +18,7 @@ int __exit()
 
 int __handle_input(char* input)
 {
+
     char command[MAX_COMMAND_LENGTH];
     char file[MAX_FILENAME_LENGTH];
 
@@ -26,7 +27,7 @@ int __handle_input(char* input)
 
     sscanf(input, "%s %s", command, file);
 
-    log_debug("client", "Command read '%s', file '%s'", command, file);
+    //log_debug("client", "Command read '%s', file '%s'", command, file);
 
     if(strcmp(command, "upload") == 0)
     {
@@ -103,23 +104,25 @@ int main(int argc, char** argv)
     }
 
 
+
     if(sync_init("sync_dir") != 0)
     {
         exit(1);
     }
     else
     {
-
-        //get_sync_dir();
-
         if(watch_sync_init("sync_dir") != 0)
         {
             exit(1);
         }
+
     }
+    
+    get_sync_dir();
 
     do
     {
+        printf("\nInsert a command: ");
         fgets(input, sizeof(input), stdin);
 
     } while(__handle_input(input) == 0);

@@ -179,9 +179,17 @@ int file_print(char *path)
     file = fopen(path, "rb");
     FILE_TEMP file_temp;
 
+    log_debug("DEBUGGG", "entrou no file print!!!");
+
     while(fread(&file_temp, sizeof(file_temp), 1, file) == 1)
     {
-        printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
+        if(strcmp(file_temp.file_name,"Diretorio vazio.") == 0)
+        {  
+            printf("\n\t%s\n\n", "!!! EMPTY DIR !!!");            
+        } else 
+        {
+            printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
+        }
     }
 
     return 0;
