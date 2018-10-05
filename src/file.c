@@ -103,7 +103,7 @@ int file_get_name_from_path(char *path, char *filename)
         if (path[i] == '/')
         {
             strncpy(filename, path+i+1, ((strlen(path)-i)+1));
-            printf("%s\n", filename);
+
             return 0;
         }
     }

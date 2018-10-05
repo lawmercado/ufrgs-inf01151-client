@@ -34,6 +34,8 @@ void __watcher_handle_event(struct inotify_event *event)
     pthread_mutex_lock(&__event_handling_mutex);
     __is_event_processing = 1;
 
+    char path[MAX_PATH_LENGTH];
+
     if(event->len)
     {
         if(event->mask & IN_MODIFY)
@@ -41,6 +43,9 @@ void __watcher_handle_event(struct inotify_event *event)
             if(!(event->mask & IN_ISDIR))
             {
                 log_debug("sync", "'%s' modified", event->name);
+
+                file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                comm_upload(path);
             }
         }
         else if(event->mask & IN_MOVED_TO)
@@ -48,6 +53,9 @@ void __watcher_handle_event(struct inotify_event *event)
             if(!(event->mask & IN_ISDIR))
             {
                 log_debug("sync", "'%s' moved into", event->name);
+
+                file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                comm_upload(path);
             }
         }
         else if(event->mask & IN_DELETE)
@@ -55,6 +63,7 @@ void __watcher_handle_event(struct inotify_event *event)
             if(!(event->mask & IN_ISDIR))
             {
                 log_debug("sync", "'%s' deleted", event->name);
+                comm_delete(event->name);
             }
         }
         else if(event->mask & IN_MOVED_FROM)
@@ -62,6 +71,7 @@ void __watcher_handle_event(struct inotify_event *event)
             if(!(event->mask & IN_ISDIR))
             {
                 log_debug("sync", "'%s' moved from", event->name);
+                comm_delete(event->name);
             }
         }
     }
@@ -154,8 +164,8 @@ int sync_init(char *dir_path)
 int sync_watcher_init(char *dir_path)
 {
     __watched_dir_path = dir_path;
-
     __inotify_instance = inotify_init1(IN_NONBLOCK);
+    __stop_event_handling = 0;
 
     // Checking for error
     if(__inotify_instance < 0)
@@ -230,6 +240,30 @@ int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
     if(file_write_buffer(path, buffer, length) != 0)
     {
         log_error("sync", "Could not update the file '%s'", name);
+
+        return -1;
+    }
+
+    if(sync_watcher_init(__watched_dir_path) != 0)
+    {
+        log_error("sync", "Could not initialize the synchronization process");
+
+        return -1;
+    }
+
+    return 0;
+}
+
+int sync_delete_file(char name[MAX_FILENAME_LENGTH])
+{
+    sync_watcher_stop();
+
+    char path[MAX_PATH_LENGTH];
+    file_path(__watched_dir_path, name, path, MAX_PATH_LENGTH);
+
+    if(file_delete(path) != 0)
+    {
+        log_error("sync", "Could not delete the file");
 
         return -1;
     }

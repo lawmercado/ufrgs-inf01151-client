@@ -8,12 +8,15 @@
 #include <netdb.h>
 #include <poll.h>
 #include <math.h>
+#include <pthread.h>
 #include "comm.h"
+#include "sync.h"
 #include "log.h"
 #include "file.h"
 
 #include <dirent.h>
 
+pthread_mutex_t __command_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 int __socket_instance;
 struct sockaddr_in __server_sockaddr;
 char* username;
@@ -94,7 +97,6 @@ int __comm_download_all_dir(char * temp_file)
 
       if(strcmp(str, "DiretorioVazio") == 0)
       {
-          printf("Empty dir: Nothing to download and sync...\n");
           file_delete(str);
           return 0;
       }
@@ -111,6 +113,8 @@ int comm_get_sync_dir()
 {
     char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
 
+    pthread_mutex_lock(&__command_handling_mutex);
+
     if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
     {
         log_error("comm", "send command get_sync_dir error!");
@@ -124,6 +128,8 @@ int comm_get_sync_dir()
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
+            pthread_mutex_unlock(&__command_handling_mutex);
+
             __comm_download_all_dir(temp_file);
 
             file_delete(temp_file);
@@ -132,12 +138,16 @@ int comm_get_sync_dir()
         }
     }
 
-    return 0;
+    pthread_mutex_unlock(&__command_handling_mutex);
+
+    return -1;
 }
 
 int comm_list_server()
 {
     char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
+
+    pthread_mutex_lock(&__command_handling_mutex);
 
     if(__send_command(&__server_sockaddr, list_server_command) == 0)
     {
@@ -146,6 +156,8 @@ int comm_list_server()
         if(__receive_file(&__server_sockaddr, temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
+
+            pthread_mutex_unlock(&__command_handling_mutex);
 
             FILE *file = NULL;
 
@@ -166,18 +178,21 @@ int comm_list_server()
         }
     }
 
-    return 0;
+    pthread_mutex_unlock(&__command_handling_mutex);
+
+    return -1;
 }
 
 int comm_download(char *file, char *dest)
 {
     char download_command[COMM_PPAYLOAD_LENGTH];
+    char path[MAX_PATH_LENGTH];
 
     sprintf(download_command, "download %s", file);
 
-    char path[MAX_PATH_LENGTH];
-
     file_path(dest, file, path, MAX_PATH_LENGTH);
+
+    pthread_mutex_lock(&__command_handling_mutex);
 
     if(__send_command(&__server_sockaddr, download_command) == 0)
     {
@@ -185,9 +200,13 @@ int comm_download(char *file, char *dest)
         {
             log_debug("comm", "'%s' downloaded", file);
 
+            pthread_mutex_unlock(&__command_handling_mutex);
+
             return 0;
         }
     }
+
+    pthread_mutex_unlock(&__command_handling_mutex);
 
     return -1;
 }
@@ -204,13 +223,44 @@ int comm_upload(char *path)
 
     sprintf(upload_command, "upload %s", filename);
 
+    pthread_mutex_lock(&__command_handling_mutex);
+
     if(__send_command(&__server_sockaddr, upload_command) == 0)
     {
         if(__send_file(&__server_sockaddr, path) == 0)
         {
             log_debug("comm", "'%s' uploaded into '%s'", path, filename);
+
+            pthread_mutex_unlock(&__command_handling_mutex);
+
+            return 0;
         }
     }
+
+    pthread_mutex_unlock(&__command_handling_mutex);
+
+    return -1;
+}
+
+int comm_delete(char *file)
+{
+    char delete_command[COMM_PPAYLOAD_LENGTH];
+
+    bzero(delete_command, COMM_PPAYLOAD_LENGTH);
+    sprintf(delete_command, "delete %s", file);
+
+    pthread_mutex_lock(&__command_handling_mutex);
+
+    if(__send_command(&__server_sockaddr, delete_command) == 0)
+    {
+        log_debug("comm", "'%s' removed", file);
+
+        pthread_mutex_unlock(&__command_handling_mutex);
+
+        return 0;
+    }
+
+    pthread_mutex_unlock(&__command_handling_mutex);
 
     return -1;
 }
@@ -255,7 +305,18 @@ int __logout(struct sockaddr_in *sockaddr)
     bzero(logout_command, COMM_PPAYLOAD_LENGTH);
     sprintf(logout_command, "logout");
 
-    return __send_command(sockaddr, logout_command);
+    pthread_mutex_lock(&__command_handling_mutex);
+
+    if(__send_command(sockaddr, logout_command) == 0)
+    {
+        pthread_mutex_unlock(&__command_handling_mutex);
+
+        return 0;
+    }
+
+    pthread_mutex_unlock(&__command_handling_mutex);
+
+    return -1;
 }
 
 void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port)
@@ -297,38 +358,16 @@ int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *pa
     int status;
     struct sockaddr_in from;
     socklen_t from_length = sizeof(struct sockaddr_in);
-    struct pollfd fd;
-    int res;
 
-    fd.fd = __socket_instance;
-    fd.events = POLLIN;
+    // Receives an ack from the server
+    status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
 
-    res = poll(&fd, 1, COMM_TIMEOUT);
-
-    if(res == 0)
+    if(status < 0)
     {
-        log_error("comm", "Connection timed out");
-
-        return COMM_TIMEOUT_ERROR;
-    }
-    else if(res == -1)
-    {
-        log_error("comm", "Polling error");
-
         return -1;
     }
-    else
-    {
-        // Receives an ack from the server
-        status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
 
-        if(status < 0)
-        {
-            return -1;
-        }
-
-        return 0;
-    }
+    return 0;
 }
 
 int __send_ack(struct sockaddr_in *server_sockaddr)

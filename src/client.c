@@ -18,16 +18,13 @@ int __exit()
 
 int __handle_input(char* input)
 {
-
     char command[MAX_COMMAND_LENGTH];
     char file[MAX_FILENAME_LENGTH];
 
     bzero((void *) command, MAX_COMMAND_LENGTH);
     bzero((void *) file, MAX_FILENAME_LENGTH);
 
-    sscanf(input, "%s %s", command, file);
-
-    //log_debug("client", "Command read '%s', file '%s'", command, file);
+    sscanf(input, "%s %[^\n\t]s", command, file);
 
     if(strcmp(command, "upload") == 0)
     {
@@ -76,7 +73,6 @@ int __handle_input(char* input)
     }
     else if(strcmp(command, "exit") == 0)
     {
-        // TODO: here we should kill all threads (communication and synchronization related threads) and logout
         return -1;
     }
     else
@@ -98,6 +94,8 @@ int main(int argc, char** argv)
     	exit(1);
   	}
 
+    fprintf(stderr, "Initializing...\n");
+
     if(comm_init(argv[1], argv[2], atoi(argv[3])) != 0)
     {
         exit(1);
@@ -117,7 +115,7 @@ int main(int argc, char** argv)
 
     do
     {
-        printf("\nInsert a command: ");
+        fprintf(stderr, "%s@%s# ", argv[1], argv[2]);
         fgets(input, sizeof(input), stdin);
 
     } while(__handle_input(input) == 0);
@@ -129,17 +127,30 @@ int main(int argc, char** argv)
 
 void upload(char *file)
 {
-    comm_upload(file);
+    fprintf(stderr, "Uploading... ");
+
+    if(comm_upload(file) == 0)
+    {
+        fprintf(stderr, "Done!\n");
+    }
 }
 
 void download(char *file)
 {
-    comm_download(file, ".");
+    fprintf(stderr, "Downloading... ");
+
+    if(comm_download(file, ".") == 0)
+    {
+        fprintf(stderr, "Done!\n");
+    }
 }
 
 void delete(char *file)
 {
-
+    if(comm_delete(file) == 0)
+    {
+        fprintf(stderr, "File deleted!\n");
+    }
 }
 
 void list_server()
@@ -154,7 +165,9 @@ void list_client()
 
 void get_sync_dir()
 {
+    fprintf(stderr, "Syncing your directory... ");
     sync_watcher_stop();
     comm_get_sync_dir();
     sync_watcher_init("sync_dir");
+    fprintf(stderr, "Done!\n");
 }

@@ -27,6 +27,8 @@ void sync_watcher_stop();
  */
 int sync_update_file(char *name, char *buffer, int length);
 
+int sync_delete_file(char *name);
+
 /**
  * List the content of the watched directory
  *
