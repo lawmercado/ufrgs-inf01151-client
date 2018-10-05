@@ -118,7 +118,7 @@ int main(int argc, char** argv)
 
     }
     
-    get_sync_dir();
+    //get_sync_dir();
 
     do
     {

@@ -85,7 +85,10 @@ int __comm_download_all_dir(char * temp_file)
 
     while(fgets (str, FILENAME_MAX, fp)!=NULL ) 
     {
-      log_debug("comm", "Arquivo a ser baixado: %s\n", str);
+      
+      str[strlen(str) - 1] = '\0';
+
+      log_debug("comm", "Starting '%s' download...", str);
 
       if(strcmp(str, "DiretorioVazio") == 0)
       {
