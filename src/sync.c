@@ -184,7 +184,7 @@ int sync_init(char *dir_path)
 {
     if(__initialize_dir(dir_path) == 0)
     {
-        comm_get_sync_dir();
+        //comm_get_sync_dir();
     }
 
     __stop_synchronizer = 0;
