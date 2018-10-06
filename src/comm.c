@@ -317,6 +317,8 @@ int __login(struct sockaddr_in *tmp_sockaddr, char* username)
 
     sprintf(login_command, "login %s", username);
 
+    pthread_mutex_lock(&__command_handling_mutex);
+
     if(__send_command(tmp_sockaddr, login_command) == 0)
     {
         if(__receive_data(tmp_sockaddr, &packet) == 0)
@@ -325,9 +327,13 @@ int __login(struct sockaddr_in *tmp_sockaddr, char* username)
 
             log_debug("comm", "Client port %d", port);
 
+            pthread_mutex_unlock(&__command_handling_mutex);
+
             return port;
         }
     }
+
+    pthread_mutex_unlock(&__command_handling_mutex);
 
     return -1;
 }
