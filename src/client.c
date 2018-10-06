@@ -11,6 +11,7 @@
 int __exit()
 {
     sync_watcher_stop();
+    sync_stop();
     comm_stop();
 
     return 0;
@@ -149,7 +150,10 @@ void delete(char *file)
 {
     if(comm_delete(file) == 0)
     {
-        fprintf(stderr, "File deleted!\n");
+        if(sync_delete_file(file) == 0)
+        {
+            fprintf(stderr, "File deleted!\n");
+        }
     }
 }
 

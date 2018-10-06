@@ -135,8 +135,6 @@ void *__watcher()
 
 void *__check_for_sync()
 {
-    fprintf(stderr, "AOOOOOOOOO\n");
-
     while(!__stop_synchronizer)
     {
         char command[COMM_PPAYLOAD_LENGTH];
@@ -189,7 +187,26 @@ int sync_init(char *dir_path)
         comm_get_sync_dir();
     }
 
-    pthread_create(&__sync_checker_thread, NULL, __check_for_sync, NULL);
+    __stop_synchronizer = 0;
+
+    if(pthread_create(&__sync_checker_thread, NULL, __check_for_sync, NULL) == -1)
+    {
+        log_error("sync", "Could not create the synchornizer thread");
+        return -1;
+    }
+
+    log_debug("sync", "Syncronizer stopped");
+
+    return 0;
+}
+
+int sync_stop()
+{
+    __stop_synchronizer = 1;
+
+    pthread_join(__sync_checker_thread, NULL);
+
+    log_debug("sync", "Syncronizer stopped");
 
     return 0;
 }

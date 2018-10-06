@@ -3,6 +3,8 @@
 
 int sync_init(char *dir_path);
 
+int sync_stop();
+
 /**
  * Initializes the synchronization in the specified directory to be synchronized
  *
