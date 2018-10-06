@@ -114,6 +114,8 @@ int main(int argc, char** argv)
         }
     }
 
+    get_sync_dir();
+
     do
     {
         fprintf(stderr, "%s@%s# ", argv[1], argv[2]);
