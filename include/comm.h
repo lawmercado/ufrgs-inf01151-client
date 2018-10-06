@@ -4,11 +4,11 @@
 #include <netdb.h>
 
 #define COMM_TIMEOUT 20000
-#define COMM_PPAYLOAD_LENGTH 256
+#define COMM_PPAYLOAD_LENGTH 512
 #define COMM_PTYPE_DATA 0
 #define COMM_PTYPE_CMD 1
 #define COMM_PTYPE_ACK 2
-#define COMM_TIMEOUT_ERROR 2
+#define COMM_COMMAND_LENGTH 64
 
 struct comm_packet {
     uint16_t type; // Packet type (COMM_PTYPE_*)
@@ -31,5 +31,7 @@ int comm_list_server();
 int comm_get_sync_dir();
 
 int comm_stop();
+
+int comm_check_sync();
 
 #endif

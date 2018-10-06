@@ -14,10 +14,12 @@
 #define EVENT_BUF_LEN (1024 * (EVENT_SIZE + 16))
 
 pthread_t __watcher_thread;
+pthread_t __sync_checker_thread;
 pthread_mutex_t __event_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t __events_done_processing = PTHREAD_COND_INITIALIZER;
 int __is_event_processing = 0;
 int __stop_event_handling = 0;
+int __stop_synchronizer = 0;
 
 int __inotify_instance;
 int __inotify_dir_watcher;
@@ -131,6 +133,41 @@ void *__watcher()
     pthread_exit(NULL);
 }
 
+void *__check_for_sync()
+{
+    fprintf(stderr, "AOOOOOOOOO\n");
+
+    while(!__stop_synchronizer)
+    {
+        char command[COMM_PPAYLOAD_LENGTH];
+        char operation[COMM_COMMAND_LENGTH];
+        char file[MAX_FILENAME_LENGTH];
+        bzero(command, COMM_PPAYLOAD_LENGTH);
+        bzero(operation, COMM_COMMAND_LENGTH);
+        bzero(file, MAX_FILENAME_LENGTH);
+
+        if(comm_check_sync(command) == 0)
+        {
+            sscanf(command, "%s %[^\n\t]s", operation, file);
+
+            if(strcmp(operation, "download") == 0)
+            {
+                sync_watcher_stop();
+                comm_download(file, __watched_dir_path);
+                sync_watcher_init(__watched_dir_path);
+            }
+            else if(strcmp(operation, "delete") == 0)
+            {
+                sync_delete_file(file);
+            }
+        }
+
+        sleep(1);
+    }
+
+    pthread_exit(NULL);
+}
+
 int __initialize_dir(char *dir_path)
 {
     if(file_exists(dir_path))
@@ -151,6 +188,8 @@ int sync_init(char *dir_path)
     {
         comm_get_sync_dir();
     }
+
+    pthread_create(&__sync_checker_thread, NULL, __check_for_sync, NULL);
 
     return 0;
 }

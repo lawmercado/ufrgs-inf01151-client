@@ -74,6 +74,40 @@ int comm_init(char* username, char *host, int port)
     return -1;
 }
 
+int comm_check_sync(char *command)
+{
+    char sync_command[COMM_PPAYLOAD_LENGTH] = "synchronize";
+
+    pthread_mutex_lock(&__command_handling_mutex);
+
+    if(__send_command(&__server_sockaddr, sync_command) != 0)
+    {
+        log_error("comm", "Could not send the synchronize command!");
+    }
+    else
+    {
+        struct comm_packet packet;
+
+        if(__receive_data(&__server_sockaddr, &packet) == 0)
+        {
+            if(strlen(packet.payload) > 6)
+            {
+                strcpy(command, packet.payload);
+
+                pthread_mutex_unlock(&__command_handling_mutex);
+
+                return 0;
+            }
+
+            log_debug("comm", "No file to sync!");
+        }
+    }
+
+    pthread_mutex_unlock(&__command_handling_mutex);
+
+    return -1;
+}
+
 int __comm_download_all_dir(char * temp_file)
 {
     FILE *fp;
