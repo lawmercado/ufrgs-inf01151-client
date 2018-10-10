@@ -111,12 +111,12 @@ int comm_check_sync(char *command)
 int __comm_download_all_dir(char * temp_file)
 {
     FILE *fp;
-    char str[60];
+    char str[FILENAME_MAX];
 
     /* opening file for reading */
     fp = fopen(temp_file , "r");
     if(fp == NULL) {
-      perror("Error opening file");
+      perror("fopen");
       return(-1);
     }
 
@@ -158,6 +158,7 @@ int comm_get_sync_dir()
     else
     {
         char temp_file[MAX_FILENAME_LENGTH];
+        bzero(temp_file, MAX_FILENAME_LENGTH);
         strcat(temp_file, "temp.txt");
 
         if(__receive_file(&__server_sockaddr, temp_file) == 0)
@@ -414,8 +415,6 @@ int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *pa
 
 int __send_ack(struct sockaddr_in *server_sockaddr)
 {
-    log_debug("comm", "Sending ack");
-
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_ACK;
@@ -459,8 +458,6 @@ int __receive_ack(struct sockaddr_in *server_sockaddr)
 
 int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
-    log_debug("comm", "Sending data");
-
     packet->type = COMM_PTYPE_DATA;
 
     if(__send_packet(server_sockaddr, packet) != 0)
@@ -497,8 +494,6 @@ int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *pack
 
 int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
-    log_debug("comm", "Sending command");
-
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_CMD;
