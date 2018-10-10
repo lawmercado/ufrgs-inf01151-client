@@ -112,6 +112,11 @@ int main(int argc, char** argv)
         {
             exit(1);
         }
+        
+        if(comm_get_sync_dir() != 0)
+        {
+            exit(1);
+        }
     }
 
     do

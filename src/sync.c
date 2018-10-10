@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <dirent.h>
+#include <string.h>
 #include <sys/inotify.h>
 #include "sync.h"
 #include "file.h"
@@ -40,40 +41,54 @@ void __watcher_handle_event(struct inotify_event *event)
 
     if(event->len)
     {
-        if(event->mask & IN_MODIFY)
+        // Ignoring hidden files
+        if(event->name[0] != '.')
         {
-            if(!(event->mask & IN_ISDIR))
+            if(event->mask & IN_MODIFY)
             {
-                log_debug("sync", "'%s' modified", event->name);
+                if(!(event->mask & IN_ISDIR))
+                {
+                    log_debug("sync", "'%s' modified", event->name);
 
-                file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
-                comm_upload(path);
+                    file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                    comm_upload(path);
+                }
             }
-        }
-        else if(event->mask & IN_MOVED_TO)
-        {
-            if(!(event->mask & IN_ISDIR))
+            else if(event->mask & IN_CREATE)
             {
-                log_debug("sync", "'%s' moved into", event->name);
+                if(!(event->mask & IN_ISDIR))
+                {
+                    log_debug("sync", "'%s' created", event->name);
 
-                file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
-                comm_upload(path);
+                    file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                    comm_upload(path);
+                }
             }
-        }
-        else if(event->mask & IN_DELETE)
-        {
-            if(!(event->mask & IN_ISDIR))
+            else if(event->mask & IN_MOVED_TO)
             {
-                log_debug("sync", "'%s' deleted", event->name);
-                comm_delete(event->name);
+                if(!(event->mask & IN_ISDIR))
+                {
+                    log_debug("sync", "'%s' moved into", event->name);
+
+                    file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                    comm_upload(path);
+                }
             }
-        }
-        else if(event->mask & IN_MOVED_FROM)
-        {
-            if(!(event->mask & IN_ISDIR))
+            else if(event->mask & IN_DELETE)
             {
-                log_debug("sync", "'%s' moved from", event->name);
-                comm_delete(event->name);
+                if(!(event->mask & IN_ISDIR))
+                {
+                    log_debug("sync", "'%s' deleted", event->name);
+                    comm_delete(event->name);
+                }
+            }
+            else if(event->mask & IN_MOVED_FROM)
+            {
+                if(!(event->mask & IN_ISDIR))
+                {
+                    log_debug("sync", "'%s' moved from", event->name);
+                    comm_delete(event->name);
+                }
             }
         }
     }
@@ -182,9 +197,9 @@ int __initialize_dir(char *dir_path)
 
 int sync_init(char *dir_path)
 {
-    if(__initialize_dir(dir_path) == 0)
+    if(__initialize_dir(dir_path) != 0)
     {
-        comm_get_sync_dir();
+        return -1;
     }
 
     __stop_synchronizer = 0;
@@ -232,7 +247,7 @@ int sync_watcher_init(char *dir_path)
     }
 
     // Adding the specified directory into watch list
-    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MODIFY | IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM);
+    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MODIFY | IN_CREATE | IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM);
 
     // Checking for error
     if(__inotify_dir_watcher < 0)

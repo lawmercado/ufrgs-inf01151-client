@@ -151,7 +151,7 @@ int comm_get_sync_dir()
 
     if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
     {
-        log_error("comm", "send command get_sync_dir error!");
+        log_error("comm", "Send command get_sync_dir error!");
     }
     else
     {
