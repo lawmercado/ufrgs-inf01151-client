@@ -78,7 +78,9 @@ int comm_check_sync(char *command)
 {
     char sync_command[COMM_PPAYLOAD_LENGTH] = "synchronize";
 
+    log_debug("comm", "SYNC LOCK 1");
     pthread_mutex_lock(&__command_handling_mutex);
+    log_debug("comm", "SYNC LOCK 2");
 
     if(__send_command(&__server_sockaddr, sync_command) != 0)
     {
@@ -94,7 +96,9 @@ int comm_check_sync(char *command)
             {
                 strcpy(command, packet.payload);
 
+                log_debug("comm", "SYNC UNLOCK 1 S");
                 pthread_mutex_unlock(&__command_handling_mutex);
+                log_debug("comm", "SYNC UNLOCK 2 S");
 
                 return 0;
             }
@@ -103,7 +107,9 @@ int comm_check_sync(char *command)
         }
     }
 
+    log_debug("comm", "SYNC UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "SYNC UNLOCK 2 E");
 
     return -1;
 }
@@ -149,7 +155,11 @@ int comm_get_sync_dir()
 {
     char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
 
+    log_debug("comm", "GET SYNC DIR LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "GET SYNC DIR LOCK 2");
 
     if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
     {
@@ -165,7 +175,9 @@ int comm_get_sync_dir()
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
+            log_debug("comm", "GET SYNC DIR UNLOCK 1 S");
             pthread_mutex_unlock(&__command_handling_mutex);
+            log_debug("comm", "GET SYNC DIR UNLOCK 2 S");
 
             __comm_download_all_dir(temp_file);
 
@@ -175,7 +187,9 @@ int comm_get_sync_dir()
         }
     }
 
+    log_debug("comm", "GET SYNC DIR UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "GET SYNC DIR UNLOCK 2 E");
 
     return -1;
 }
@@ -184,7 +198,11 @@ int comm_list_server()
 {
     char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
 
+    log_debug("comm", "LIST SERVER DIR LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "LIST SERVER DIR LOCK 2");
 
     if(__send_command(&__server_sockaddr, list_server_command) == 0)
     {
@@ -194,7 +212,9 @@ int comm_list_server()
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
+            log_debug("comm", "LIST SERVER UNLOCK 1 S");
             pthread_mutex_unlock(&__command_handling_mutex);
+            log_debug("comm", "LIST SERVER UNLOCK 2 S");
 
             FILE *file = NULL;
 
@@ -215,13 +235,16 @@ int comm_list_server()
         }
     }
 
+    log_debug("comm", "LIST SERVER UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "LIST SERVER UNLOCK 2 E");
 
     return -1;
 }
 
 int comm_download(char *file, char *dest)
 {
+
     char download_command[COMM_PPAYLOAD_LENGTH];
     char path[MAX_PATH_LENGTH];
 
@@ -229,7 +252,11 @@ int comm_download(char *file, char *dest)
 
     file_path(dest, file, path, MAX_PATH_LENGTH);
 
+    log_debug("comm", "DOWNLOAD LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "DOWNLOAD LOCK 2");
 
     if(__send_command(&__server_sockaddr, download_command) == 0)
     {
@@ -237,13 +264,17 @@ int comm_download(char *file, char *dest)
         {
             log_debug("comm", "'%s' downloaded", file);
 
+            log_debug("comm", "DOWNLOAD UNLOCK 1 S");
             pthread_mutex_unlock(&__command_handling_mutex);
+            log_debug("comm", "DOWNLOAD UNLOCK 2 S");
 
             return 0;
         }
     }
 
+    log_debug("comm", "DOWNLOAD UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "DOWNLOAD UNLOCK 2 E");
 
     return -1;
 }
@@ -260,7 +291,11 @@ int comm_upload(char *path)
 
     sprintf(upload_command, "upload %s", filename);
 
+    log_debug("comm", "UPLOAD LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "UPLOAD LOCK 2");
 
     if(__send_command(&__server_sockaddr, upload_command) == 0)
     {
@@ -268,13 +303,17 @@ int comm_upload(char *path)
         {
             log_debug("comm", "'%s' uploaded into '%s'", path, filename);
 
+            log_debug("comm", "UPLOAD UNLOCK 1 S");
             pthread_mutex_unlock(&__command_handling_mutex);
+            log_debug("comm", "UPLOAD UNLOCK 2 S");
 
             return 0;
         }
     }
 
+    log_debug("comm", "UPLOAD UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "UPLOAD UNLOCK 2 E");
 
     return -1;
 }
@@ -286,18 +325,26 @@ int comm_delete(char *file)
     bzero(delete_command, COMM_PPAYLOAD_LENGTH);
     sprintf(delete_command, "delete %s", file);
 
+    log_debug("comm", "DELETE LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "DELETE LOCK 2");
 
     if(__send_command(&__server_sockaddr, delete_command) == 0)
     {
         log_debug("comm", "'%s' removed", file);
 
+        log_debug("comm", "DELETE UNLOCK 1 S");
         pthread_mutex_unlock(&__command_handling_mutex);
+        log_debug("comm", "DELETE UNLOCK 2 S");
 
         return 0;
     }
 
+    log_debug("comm", "DELETE UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "DELETE UNLOCK 2 E");
 
     return -1;
 }
@@ -320,7 +367,11 @@ int __login(struct sockaddr_in *tmp_sockaddr, char* username)
 
     sprintf(login_command, "login %s", username);
 
+    log_debug("comm", "LOGIN LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "LOGIN LOCK 2");
 
     if(__send_command(tmp_sockaddr, login_command) == 0)
     {
@@ -330,13 +381,17 @@ int __login(struct sockaddr_in *tmp_sockaddr, char* username)
 
             log_debug("comm", "Client port %d", port);
 
+            log_debug("comm", "LOGIN UNLOCK 1 S");
             pthread_mutex_unlock(&__command_handling_mutex);
+            log_debug("comm", "LOGIN UNLOCK 2 S");
 
             return port;
         }
     }
 
+    log_debug("comm", "LOGIN UNLOCK 1 E");
     pthread_mutex_unlock(&__command_handling_mutex);
+    log_debug("comm", "LOGIN UNLOCK 2 E");
 
     return -1;
 }
@@ -348,7 +403,11 @@ int __logout(struct sockaddr_in *sockaddr)
     bzero(logout_command, COMM_PPAYLOAD_LENGTH);
     sprintf(logout_command, "logout");
 
+    log_debug("comm", "LOGOUT LOCK 1");
+
     pthread_mutex_lock(&__command_handling_mutex);
+
+    log_debug("comm", "LOGOUT LOCK 2");
 
     if(__send_command(sockaddr, logout_command) == 0)
     {
@@ -435,8 +494,6 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
 
 int __receive_ack(struct sockaddr_in *server_sockaddr)
 {
-    log_debug("comm", "Receiving ack");
-
     struct comm_packet packet;
 
     if(__receive_packet(server_sockaddr, &packet) != 0)
@@ -472,8 +529,6 @@ int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 
 int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
-    log_debug("comm", "Receiving data");
-
     if(__receive_packet(server_sockaddr, packet) != 0)
     {
         log_error("comm", "Could not receive the data");
@@ -516,8 +571,6 @@ int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
 
 int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
-    log_debug("comm", "Receiving command");
-
     struct comm_packet packet;
 
     if(__receive_packet(server_sockaddr, &packet) != 0)

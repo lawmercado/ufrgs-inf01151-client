@@ -1,7 +1,9 @@
 #ifndef __SYNC_H__
 #define __SYNC_H__
 
-int sync_init(char *dir_path);
+int sync_init();
+
+int sync_setup(char *dir_path);
 
 int sync_stop();
 

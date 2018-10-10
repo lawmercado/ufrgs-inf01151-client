@@ -162,7 +162,6 @@ void *__check_for_sync()
         if(comm_check_sync(command) == 0)
         {
             sscanf(command, "%s %[^\n\t]s", operation, file);
-
             if(strcmp(operation, "download") == 0)
             {
                 sync_watcher_stop();
@@ -195,13 +194,13 @@ int __initialize_dir(char *dir_path)
     return 0;
 }
 
-int sync_init(char *dir_path)
+int sync_setup(char *dir_path)
 {
-    if(__initialize_dir(dir_path) != 0)
-    {
-        return -1;
-    }
+    return __initialize_dir(dir_path);
+}
 
+int sync_init()
+{
     __stop_synchronizer = 0;
 
     if(pthread_create(&__sync_checker_thread, NULL, __check_for_sync, NULL) == -1)
@@ -210,13 +209,15 @@ int sync_init(char *dir_path)
         return -1;
     }
 
-    log_debug("sync", "Syncronizer stopped");
+    log_debug("sync", "Syncronizer initialized");
 
     return 0;
 }
 
 int sync_stop()
 {
+    log_debug("sync", "SYNC STOP");
+
     __stop_synchronizer = 1;
 
     pthread_join(__sync_checker_thread, NULL);

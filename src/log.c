@@ -5,13 +5,13 @@
 void __debug_print(char* module_name, const char* message)
 {
     #ifdef DEBUG
-        printf("DEBUG: %s: %s\n", module_name, message);
+        fprintf(stderr, "DEBUG: %s: %s\n", module_name, message);
     #endif
 }
 
 void __error_print(char* module_name, const char* message)
 {
-    printf("ERROR: %s: %s\n", module_name, message);
+    fprintf(stderr, "ERROR: %s: %s\n", module_name, message);
 }
 
 void log_debug(char* module_name, const char* message, ...)
