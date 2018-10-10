@@ -135,7 +135,9 @@ int __comm_download_all_dir(char * temp_file)
           return 0;
       }
 
+      sync_watcher_stop();
       comm_download(str, "./sync_dir");
+      sync_watcher_init("./sync_dir");
     }
     fclose(fp);
 
