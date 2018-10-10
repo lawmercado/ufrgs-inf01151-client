@@ -284,6 +284,11 @@ int comm_upload(char *path)
     char upload_command[COMM_PPAYLOAD_LENGTH];
     char filename[MAX_FILENAME_LENGTH];
 
+    if(!file_exists(path))
+    {
+        return -1;
+    }
+
     if(file_get_name_from_path(path, filename) == -1)
     {
         strcpy(filename, path);

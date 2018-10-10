@@ -130,11 +130,21 @@ int main(int argc, char** argv)
 
 void upload(char *file)
 {
-    fprintf(stderr, "Uploading... ");
-
-    if(comm_upload(file) == 0)
+    if(file_exists(file))
     {
-        fprintf(stderr, "Done!\n");
+        fprintf(stderr, "Uploading... ");
+        if(comm_upload(file) == 0)
+        {
+            fprintf(stderr, "Done!\n");
+        }
+        else
+        {
+            fprintf(stderr, "Error\n");
+        }
+    }
+    else
+    {
+        fprintf(stderr, "File does not exist\n");
     }
 }
 
