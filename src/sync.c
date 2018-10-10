@@ -152,27 +152,7 @@ void *__check_for_sync()
 {
     while(!__stop_synchronizer)
     {
-        char command[COMM_PPAYLOAD_LENGTH];
-        char operation[COMM_COMMAND_LENGTH];
-        char file[MAX_FILENAME_LENGTH];
-        bzero(command, COMM_PPAYLOAD_LENGTH);
-        bzero(operation, COMM_COMMAND_LENGTH);
-        bzero(file, MAX_FILENAME_LENGTH);
-
-        if(comm_check_sync(command) == 0)
-        {
-            sscanf(command, "%s %[^\n\t]s", operation, file);
-            if(strcmp(operation, "download") == 0)
-            {
-                sync_watcher_stop();
-                comm_download(file, __watched_dir_path);
-                sync_watcher_init(__watched_dir_path);
-            }
-            else if(strcmp(operation, "delete") == 0)
-            {
-                sync_delete_file(file);
-            }
-        }
+        comm_check_sync();
 
         sleep(1);
     }
@@ -216,11 +196,7 @@ int sync_init()
 
 int sync_stop()
 {
-    log_debug("sync", "SYNC STOP");
-
     __stop_synchronizer = 1;
-
-    pthread_join(__sync_checker_thread, NULL);
 
     log_debug("sync", "Syncronizer stopped");
 

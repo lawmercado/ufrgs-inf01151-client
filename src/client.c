@@ -122,7 +122,7 @@ int main(int argc, char** argv)
         fgets(input, sizeof(input), stdin);
 
     } while(__handle_input(input) == 0);
-
+    
     __exit();
 
     return 0;
