@@ -182,12 +182,16 @@ int __command_check_sync(struct comm_command_args *args)
                     strncpy(downloadArgs.receivePath, "./sync_dir", FILE_PATH_LENGTH);
                     bzero(downloadArgs.sendPath, FILE_PATH_LENGTH);
 
+                    log_info("comm", "Found file to download");
+
                     sync_watcher_stop();
                     __command_download(&downloadArgs);
                     sync_watcher_init("sync_dir");
                 }
                 else if(strcmp(operation, "delete") == 0)
                 {
+                    log_info("comm", "Found file to delete");
+
                     sync_delete_file(file);
                 }
 
