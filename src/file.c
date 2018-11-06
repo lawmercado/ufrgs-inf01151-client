@@ -8,15 +8,7 @@
 #include "file.h"
 #include "log.h"
 
-/**
- * Write a file in the specified path
- *
- * @param char* path The path of the file
- * @param char* buffer The content of the file
- * @param int length The buffer size of the file
- * @return 0 if no errors, -1 otherwise
- */
-int file_write_buffer(char path[MAX_PATH_LENGTH], char *buffer, int length)
+int file_write_buffer(char path[FILE_PATH_LENGTH], char *buffer, int length)
 {
     FILE *file = NULL;
     int bytes_writen = 0, has_errors = 0;
@@ -42,22 +34,15 @@ int file_write_buffer(char path[MAX_PATH_LENGTH], char *buffer, int length)
     return !has_errors ? 0 : -1;
 }
 
-/**
- * Fills a MACTimestamp struct with the corresponding times for the file
- *
- * @param char* path The path of the file
- * @param MACTimestamp* mac The struct to initialize
- * @return 0 if no errors, -1 otherwise
- */
-int file_mac(char path[MAX_PATH_LENGTH], MACTimestamp *mac)
+int file_mac(char path[FILE_PATH_LENGTH], struct file_mactimestamp *mac)
 {
     struct stat st;
 
     if(stat(path, &st) == 0)
     {
-        strftime(mac->m, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_mtime));
-        strftime(mac->a, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_atime));
-        strftime(mac->c, MAX_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_ctime));
+        strftime(mac->m, FILE_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_mtime));
+        strftime(mac->a, FILE_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_atime));
+        strftime(mac->c, FILE_TIMESTAMP_LENGTH, "%Y %b %d %H:%M", localtime(&st.st_ctime));
 
         return 0;
     }
@@ -65,13 +50,7 @@ int file_mac(char path[MAX_PATH_LENGTH], MACTimestamp *mac)
     return -1;
 }
 
-/**
- * Gets the file size for the specified file
- *
- * @param char* path The path of the file
- * @return the file size if no errors, -1 otherwise
- */
-int file_size(char path[MAX_PATH_LENGTH])
+int file_size(char path[FILE_PATH_LENGTH])
 {
     struct stat st;
 
@@ -83,14 +62,14 @@ int file_size(char path[MAX_PATH_LENGTH])
     return -1;
 }
 
-int file_exists(char path[MAX_PATH_LENGTH])
+int file_exists(char path[FILE_PATH_LENGTH])
 {
     struct stat st;
 
     return stat(path, &st) == 0;
 }
 
-int file_create_dir(char path[MAX_PATH_LENGTH])
+int file_create_dir(char path[FILE_PATH_LENGTH])
 {
     return mkdir(path, 0700);
 }
@@ -121,7 +100,7 @@ int file_write_bytes(FILE *file, char *buffer, int length)
     return fwrite(buffer, sizeof(char), length, file);
 }
 
-int file_delete(char path[MAX_PATH_LENGTH])
+int file_delete(char path[FILE_PATH_LENGTH])
 {
     return remove(path);
 }
@@ -130,7 +109,7 @@ int file_clear_dir(char *path)
 {
     DIR *dir;
     struct dirent *entry;
-    char entry_path[MAX_PATH_LENGTH];
+    char entry_path[FILE_PATH_LENGTH];
 
     dir = opendir(path);
 
@@ -143,7 +122,7 @@ int file_clear_dir(char *path)
                 continue;
             }
 
-            file_path(path, entry->d_name, entry_path, MAX_PATH_LENGTH);
+            file_path(path, entry->d_name, entry_path, FILE_PATH_LENGTH);
 
             if(unlink(entry_path) != 0)
             {

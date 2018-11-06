@@ -20,10 +20,10 @@ int __exit()
 int __handle_input(char* input)
 {
     char command[MAX_COMMAND_LENGTH];
-    char file[MAX_FILENAME_LENGTH];
+    char file[FILE_NAME_LENGTH];
 
     bzero((void *) command, MAX_COMMAND_LENGTH);
-    bzero((void *) file, MAX_FILENAME_LENGTH);
+    bzero((void *) file, FILE_NAME_LENGTH);
 
     sscanf(input, "%s %[^\n\t]s", command, file);
 

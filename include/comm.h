@@ -2,12 +2,16 @@
 #define __COMM_H__
 
 #include <netdb.h>
+#include "file.h"
 
 #define COMM_TIMEOUT 20000
+#define COMM_ERROR_TIMEOUT -2
+
 #define COMM_PPAYLOAD_LENGTH 512
 #define COMM_PTYPE_DATA 0
 #define COMM_PTYPE_CMD 1
 #define COMM_PTYPE_ACK 2
+
 #define COMM_COMMAND_LENGTH 64
 
 struct comm_packet {
@@ -17,6 +21,14 @@ struct comm_packet {
     uint16_t length; // Payload length
     char payload[COMM_PPAYLOAD_LENGTH];
 };
+
+struct comm_command_args {
+    char fileName[FILE_NAME_LENGTH];
+    char receivePath[FILE_PATH_LENGTH];
+    char sendPath[FILE_PATH_LENGTH];
+};
+
+typedef int (*COMM_COMMAND)(struct comm_command_args*);
 
 int comm_init(char* username, char *host, int port);
 

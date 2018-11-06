@@ -37,7 +37,7 @@ void __watcher_handle_event(struct inotify_event *event)
     pthread_mutex_lock(&__event_handling_mutex);
     __is_event_processing = 1;
 
-    char path[MAX_PATH_LENGTH];
+    char path[FILE_PATH_LENGTH];
 
     if(event->len)
     {
@@ -50,7 +50,7 @@ void __watcher_handle_event(struct inotify_event *event)
                 {
                     log_debug("sync", "'%s' modified", event->name);
 
-                    file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                    file_path(__watched_dir_path, event->name, path, FILE_PATH_LENGTH);
                     comm_upload(path);
                 }
             }
@@ -60,7 +60,7 @@ void __watcher_handle_event(struct inotify_event *event)
                 {
                     log_debug("sync", "'%s' created", event->name);
 
-                    file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                    file_path(__watched_dir_path, event->name, path, FILE_PATH_LENGTH);
                     comm_upload(path);
                 }
             }
@@ -70,7 +70,7 @@ void __watcher_handle_event(struct inotify_event *event)
                 {
                     log_debug("sync", "'%s' moved into", event->name);
 
-                    file_path(__watched_dir_path, event->name, path, MAX_PATH_LENGTH);
+                    file_path(__watched_dir_path, event->name, path, FILE_PATH_LENGTH);
                     comm_upload(path);
                 }
             }
@@ -278,12 +278,12 @@ void sync_watcher_stop()
  * @param int length The buffer size of the file
  * @return 0 if no errors, -1 otherwise
  */
-int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
+int sync_update_file(char name[FILE_NAME_LENGTH], char *buffer, int length)
 {
     sync_watcher_stop();
 
-    char path[MAX_PATH_LENGTH];
-    file_path(__watched_dir_path, name, path, MAX_PATH_LENGTH);
+    char path[FILE_PATH_LENGTH];
+    file_path(__watched_dir_path, name, path, FILE_PATH_LENGTH);
 
     if(file_write_buffer(path, buffer, length) != 0)
     {
@@ -302,12 +302,12 @@ int sync_update_file(char name[MAX_FILENAME_LENGTH], char *buffer, int length)
     return 0;
 }
 
-int sync_delete_file(char name[MAX_FILENAME_LENGTH])
+int sync_delete_file(char name[FILE_NAME_LENGTH])
 {
     sync_watcher_stop();
 
-    char path[MAX_PATH_LENGTH];
-    file_path(__watched_dir_path, name, path, MAX_PATH_LENGTH);
+    char path[FILE_PATH_LENGTH];
+    file_path(__watched_dir_path, name, path, FILE_PATH_LENGTH);
 
     if(file_delete(path) != 0)
     {
@@ -335,8 +335,8 @@ int sync_list_files()
 {
     DIR *watched_dir;
     struct dirent *entry;
-    char path[MAX_PATH_LENGTH];
-    MACTimestamp entryMAC;
+    char path[FILE_PATH_LENGTH];
+    struct file_mactimestamp entryMAC;
 
     watched_dir = opendir(__watched_dir_path);
 
@@ -349,7 +349,7 @@ int sync_list_files()
                 continue;
             }
 
-            file_path(__watched_dir_path, entry->d_name, path, MAX_PATH_LENGTH);
+            file_path(__watched_dir_path, entry->d_name, path, FILE_PATH_LENGTH);
 
             if(file_mac(path, &entryMAC) == 0)
             {

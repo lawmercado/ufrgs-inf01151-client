@@ -8,25 +8,17 @@
 #include <netdb.h>
 #include <poll.h>
 #include <math.h>
+#include <dirent.h>
 #include <pthread.h>
 #include "comm.h"
 #include "sync.h"
 #include "log.h"
 #include "file.h"
 
-#include <dirent.h>
-
 pthread_mutex_t __command_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int __socket_instance;
 struct sockaddr_in __server_sockaddr;
-char* username;
-
-int __download(char *file, char *path);
-int __login(struct sockaddr_in *tmp_sockaddr, char* username);
-int __logout(struct sockaddr_in *tmp_sockaddr);
-
-void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port);
 
 int __send_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
 int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
@@ -36,197 +28,30 @@ int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
 int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH]);
 int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH]);
-int __send_file(struct sockaddr_in *server_sockaddr, char path[MAX_PATH_LENGTH]);
-int __receive_file(struct sockaddr_in *server_sockaddr, char path[MAX_PATH_LENGTH]);
+int __send_file(struct sockaddr_in *server_sockaddr, char path[FILE_PATH_LENGTH]);
+int __receive_file(struct sockaddr_in *server_sockaddr, char path[FILE_PATH_LENGTH]);
 
-int __check_sync()
-{
-    char sync_command[COMM_PPAYLOAD_LENGTH] = "synchronize";
-    char command[COMM_PPAYLOAD_LENGTH];
-    char operation[COMM_COMMAND_LENGTH];
-    char file[MAX_FILENAME_LENGTH];
-    bzero(command, COMM_PPAYLOAD_LENGTH);
-    bzero(operation, COMM_COMMAND_LENGTH);
-    bzero(file, MAX_FILENAME_LENGTH);
-    struct comm_packet packet;
-
-    if(__send_command(&__server_sockaddr, sync_command) != 0)
-    {
-        log_error("comm", "Could not send the synchronize command!");
-    }
-    else
-    {
-        if(__receive_data(&__server_sockaddr, &packet) == 0)
-        {
-            if(strlen(packet.payload) > 6)
-            {
-                strcpy(command, packet.payload);
-                
-                sscanf(command, "%s %[^\n\t]s", operation, file);
-                if(strcmp(operation, "download") == 0)
-                {
-                    sync_watcher_stop();
-                    __download(file, "./sync_dir");
-                    sync_watcher_init("sync_dir");
-                }
-                else if(strcmp(operation, "delete") == 0)
-                {
-                    sync_delete_file(file);
-                }
-
-                return 0;
-            }
-
-            log_debug("comm", "No file to sync!");
-        }
-    }
-
-    return -1;
-}
-
-int comm_check_sync()
+int __command_run(COMM_COMMAND command, struct comm_command_args *args)
 {
     pthread_mutex_lock(&__command_handling_mutex);
 
-    int result = __check_sync();
+    int result = command(args);
 
     pthread_mutex_unlock(&__command_handling_mutex);
 
     return result;
 }
 
-int __download_all_dir(char * temp_file)
-{
-    FILE *fp;
-    char str[FILENAME_MAX];
-
-    /* opening file for reading */
-    fp = fopen(temp_file , "r");
-
-    if(fp == NULL)
-    {
-        perror("fopen");
-        return(-1);
-    }
-
-    while(fgets(str, FILENAME_MAX, fp)!=NULL )
-    {
-        if(str[strlen(str) - 1] == '\n')
-        {
-            str[strlen(str) - 1] = '\0';
-        }
-
-        log_debug("comm", "Starting '%s' download...", str);
-
-        if(strcmp(str, "DiretorioVazio") == 0)
-        {
-            file_delete(str);
-            return 0;
-        }
-
-        sync_watcher_stop();
-        __download(str, "./sync_dir");
-        sync_watcher_init("./sync_dir");
-    }
-
-    fclose(fp);
-
-    return 0;
-}
-
-int __get_sync_dir()
-{
-    char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
-
-    if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
-    {
-        log_error("comm", "Send command get_sync_dir error!");
-    }
-    else
-    {
-        char temp_file[MAX_FILENAME_LENGTH];
-        bzero(temp_file, MAX_FILENAME_LENGTH);
-        strcat(temp_file, "temp.txt");
-
-        if(__receive_file(&__server_sockaddr, temp_file) == 0)
-        {
-            log_debug("comm", "'%s' downloaded", temp_file);
-
-            __download_all_dir(temp_file);
-
-            file_delete(temp_file);
-
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
-int comm_get_sync_dir()
-{
-    pthread_mutex_lock(&__command_handling_mutex);
-
-    int result = __get_sync_dir();
-
-    pthread_mutex_unlock(&__command_handling_mutex);
-
-    return result;
-}
-
-int __list_server()
-{
-    char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
-
-    if(__send_command(&__server_sockaddr, list_server_command) == 0)
-    {
-        char temp_file[MAX_FILENAME_LENGTH] = "temp.txt";
-
-        if(__receive_file(&__server_sockaddr, temp_file) == 0)
-        {
-            log_debug("comm", "'%s' downloaded", temp_file);
-
-            FILE *file = NULL;
-
-            file = fopen(temp_file, "rb");
-            FILE_TEMP file_temp;
-
-            while(fread(&file_temp, sizeof(file_temp), 1, file) == 1)
-            {
-                if(strcmp(file_temp.file_name, "DiretorioVazio") != 0)
-                {
-                    printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
-                }
-            }
-
-            file_delete(temp_file);
-
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
-int comm_list_server()
-{
-    pthread_mutex_lock(&__command_handling_mutex);
-
-    int result = __list_server();
-
-    pthread_mutex_unlock(&__command_handling_mutex);
-
-    return result;
-}
-
-int __download(char *file, char *dest)
+int __command_download(struct comm_command_args *args)
 {
     char download_command[COMM_PPAYLOAD_LENGTH];
-    char path[MAX_PATH_LENGTH];
+    char path[FILE_PATH_LENGTH];
+    char *file = args->fileName;
+    char *dest = args->receivePath;
 
     sprintf(download_command, "download %s", file);
 
-    file_path(dest, file, path, MAX_PATH_LENGTH);
+    file_path(dest, file, path, FILE_PATH_LENGTH);
 
     if(__send_command(&__server_sockaddr, download_command) == 0)
     {
@@ -243,19 +68,20 @@ int __download(char *file, char *dest)
 
 int comm_download(char *file, char *dest)
 {
-    pthread_mutex_lock(&__command_handling_mutex);
+    COMM_COMMAND command = __command_download;
+    struct comm_command_args args;
+    strncpy(args.fileName, file, FILE_NAME_LENGTH);
+    strncpy(args.receivePath, dest, FILE_PATH_LENGTH);
+    bzero(args.sendPath, FILE_PATH_LENGTH);
 
-    int result = __download(file, dest);
-
-    pthread_mutex_unlock(&__command_handling_mutex);
-
-    return result;
+    return __command_run(command, &args);
 }
 
-int __upload(char *path)
+int __command_upload(struct comm_command_args *args)
 {
     char upload_command[COMM_PPAYLOAD_LENGTH];
-    char filename[MAX_FILENAME_LENGTH];
+    char filename[FILE_NAME_LENGTH];
+    char *path = args->sendPath;
 
     if(!file_exists(path))
     {
@@ -284,22 +110,19 @@ int __upload(char *path)
 
 int comm_upload(char *path)
 {
-    pthread_mutex_lock(&__command_handling_mutex);
+    COMM_COMMAND command = __command_upload;
+    struct comm_command_args args;
+    bzero(args.fileName, FILE_NAME_LENGTH);
+    bzero(args.receivePath, FILE_PATH_LENGTH);
+    strncpy(args.sendPath, path, FILE_PATH_LENGTH);
 
-
-
-    int result = __upload(path);
-
-
-
-    pthread_mutex_unlock(&__command_handling_mutex);
-
-    return result;
+    return __command_run(command, &args);
 }
 
-int __delete(char *file)
+int __command_delete(struct comm_command_args *args)
 {
     char delete_command[COMM_PPAYLOAD_LENGTH];
+    char *file = args->fileName;
 
     bzero(delete_command, COMM_PPAYLOAD_LENGTH);
     sprintf(delete_command, "delete %s", file);
@@ -316,49 +139,202 @@ int __delete(char *file)
 
 int comm_delete(char *file)
 {
-    pthread_mutex_lock(&__command_handling_mutex);
+    COMM_COMMAND command = __command_delete;
+    struct comm_command_args args;
+    strncpy(args.fileName, file, FILE_NAME_LENGTH);
+    bzero(args.receivePath, FILE_PATH_LENGTH);
+    bzero(args.sendPath, FILE_PATH_LENGTH);
 
-
-
-    int result = __delete(file);
-
-
-
-    pthread_mutex_unlock(&__command_handling_mutex);
-
-    return result;
+    return __command_run(command, &args);
 }
 
-int __logout(struct sockaddr_in *sockaddr)
+int __command_check_sync(struct comm_command_args *args)
 {
-    char logout_command[COMM_PPAYLOAD_LENGTH];
+    char sync_command[COMM_PPAYLOAD_LENGTH];
+    bzero(sync_command, COMM_PPAYLOAD_LENGTH);
+    strcpy(sync_command, "synchronize");
 
-    bzero(logout_command, COMM_PPAYLOAD_LENGTH);
-    sprintf(logout_command, "logout");
+    char command[COMM_PPAYLOAD_LENGTH];
+    char operation[COMM_COMMAND_LENGTH];
+    char file[FILE_NAME_LENGTH];
+    bzero(command, COMM_PPAYLOAD_LENGTH);
+    bzero(operation, COMM_COMMAND_LENGTH);
+    bzero(file, FILE_NAME_LENGTH);
+    struct comm_packet packet;
 
-    return __send_command(sockaddr, logout_command);
-}
-
-int comm_stop()
-{
-    pthread_mutex_lock(&__command_handling_mutex);
-
-
-
-    int result = -1;
-
-    if(__logout(&__server_sockaddr) == 0)
+    if(__send_command(&__server_sockaddr, sync_command) != 0)
     {
-        close(__socket_instance);
+        log_error("comm", "Could not send the synchronize command!");
+    }
+    else
+    {
+        if(__receive_data(&__server_sockaddr, &packet) == 0)
+        {
+            if(strlen(packet.payload) > 6)
+            {
+                strcpy(command, packet.payload);
+                
+                sscanf(command, "%s %[^\n\t]s", operation, file);
+                if(strcmp(operation, "download") == 0)
+                {
+                    struct comm_command_args downloadArgs;
+                    strncpy(downloadArgs.fileName, file, FILE_NAME_LENGTH);
+                    strncpy(downloadArgs.receivePath, "./sync_dir", FILE_PATH_LENGTH);
+                    bzero(downloadArgs.sendPath, FILE_PATH_LENGTH);
 
-        result = 0;
+                    sync_watcher_stop();
+                    __command_download(&downloadArgs);
+                    sync_watcher_init("sync_dir");
+                }
+                else if(strcmp(operation, "delete") == 0)
+                {
+                    sync_delete_file(file);
+                }
+
+                return 0;
+            }
+
+            log_debug("comm", "No file to sync!");
+        }
     }
 
+    return -1;
+}
 
+int comm_check_sync()
+{
+    COMM_COMMAND command = __command_check_sync;
 
-    pthread_mutex_unlock(&__command_handling_mutex);
+    return __command_run(command, NULL);
+}
 
-    return result;
+int __command_download_all_dir(char *temp_file)
+{
+    FILE *fp;
+    char str[FILENAME_MAX];
+
+    /* opening file for reading */
+    fp = fopen(temp_file , "r");
+
+    if(fp == NULL)
+    {
+        perror("fopen");
+        return(-1);
+    }
+
+    while(fgets(str, FILENAME_MAX, fp)!=NULL )
+    {
+        if(str[strlen(str) - 1] == '\n')
+        {
+            str[strlen(str) - 1] = '\0';
+        }
+
+        log_debug("comm", "Starting '%s' download...", str);
+
+        if(strcmp(str, "DiretorioVazio") == 0)
+        {
+            file_delete(str);
+            return 0;
+        }
+
+        struct comm_command_args downloadArgs;
+        strncpy(downloadArgs.fileName, str, FILE_NAME_LENGTH);
+        strncpy(downloadArgs.receivePath, "./sync_dir", FILE_PATH_LENGTH);
+        bzero(downloadArgs.sendPath, FILE_PATH_LENGTH);
+
+        sync_watcher_stop();
+        __command_download(&downloadArgs);
+        sync_watcher_init("./sync_dir");
+    }
+
+    fclose(fp);
+
+    return 0;
+}
+
+int __command_get_sync_dir(struct comm_command_args *args)
+{
+    char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
+
+    if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
+    {
+        log_error("comm", "Send command get_sync_dir error!");
+    }
+    else
+    {
+        char temp_file[FILE_NAME_LENGTH];
+        bzero(temp_file, FILE_NAME_LENGTH);
+        strcat(temp_file, "temp.txt");
+
+        if(__receive_file(&__server_sockaddr, temp_file) == 0)
+        {
+            log_debug("comm", "'%s' downloaded", temp_file);
+
+            __command_download_all_dir(temp_file);
+
+            file_delete(temp_file);
+
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int comm_get_sync_dir()
+{
+    COMM_COMMAND command = __command_get_sync_dir;
+
+    return __command_run(command, NULL);
+}
+
+int __command_list_server(struct comm_command_args *args)
+{
+    char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
+
+    if(__send_command(&__server_sockaddr, list_server_command) == 0)
+    {
+        char temp_file[FILE_NAME_LENGTH] = "temp.txt";
+
+        if(__receive_file(&__server_sockaddr, temp_file) == 0)
+        {
+            log_debug("comm", "'%s' downloaded", temp_file);
+
+            FILE *file = NULL;
+
+            file = fopen(temp_file, "rb");
+            struct file_status file_temp;
+
+            while(fread(&file_temp, sizeof(file_temp), 1, file) == 1)
+            {
+                if(strcmp(file_temp.file_name, "DiretorioVazio") != 0)
+                {
+                    printf("M: %s | A: %s | C: %s | '%s'\n", file_temp.file_mac.m, file_temp.file_mac.a, file_temp.file_mac.c, file_temp.file_name);
+                }
+            }
+
+            file_delete(temp_file);
+
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int comm_list_server()
+{
+    COMM_COMMAND command = __command_list_server;
+
+    return __command_run(command, NULL);
+}
+
+void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port)
+{
+    server_sockaddr->sin_family = AF_INET;
+	server_sockaddr->sin_port = htons(port);
+	server_sockaddr->sin_addr = *((struct in_addr *) server->h_addr);
+	bzero((void *) &(server_sockaddr->sin_zero), sizeof(server_sockaddr->sin_zero));
 }
 
 int __login(struct sockaddr_in *tmp_sockaddr, char* username)
@@ -418,15 +394,32 @@ int comm_init(char* username, char *host, int port)
     }
 
     close(__socket_instance);
+
     return -1;
 }
 
-void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port)
+int __command_logout(struct comm_command_args *args)
 {
-    server_sockaddr->sin_family = AF_INET;
-	server_sockaddr->sin_port = htons(port);
-	server_sockaddr->sin_addr = *((struct in_addr *) server->h_addr);
-	bzero((void *) &(server_sockaddr->sin_zero), sizeof(server_sockaddr->sin_zero));
+    char logout_command[COMM_PPAYLOAD_LENGTH];
+
+    bzero(logout_command, COMM_PPAYLOAD_LENGTH);
+    sprintf(logout_command, "logout");
+
+    if(__send_command(&__server_sockaddr, logout_command) == 0)
+    {
+        close(__socket_instance);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+int comm_stop()
+{
+    COMM_COMMAND command = __command_logout;
+
+    return __command_run(command, NULL);
 }
 
 int __send_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
@@ -445,35 +438,45 @@ int __send_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packe
 
 int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
-    /*
-    TODO: compare this with the server address to check origin
-    char clienthost[100];
-    char clientport[100];
-    int result = getnameinfo(&from, length, clienthost, sizeof(clienthost), clientport, sizeof (clientport), NI_NUMERICHOST | NI_NUMERICSERV);
-
-    if(result == 0)
-    {
-        if (from.sa_family == AF_INET)
-            printf("Received from %s %s\n", clienthost, clientport);
-    }*/
-
     int status;
     struct sockaddr_in from;
     socklen_t from_length = sizeof(struct sockaddr_in);
+    struct pollfd fd;
+    int res;
 
-    // Receives an ack from the server
-    status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
+    fd.fd = __socket_instance;
+    fd.events = POLLIN;
 
-    if(status < 0)
+    res = poll(&fd, 1, COMM_TIMEOUT);
+    if(res == 0)
     {
+        log_error("comm", "Connection timed out");
+
+        return COMM_ERROR_TIMEOUT;
+    }
+    else if(res == -1)
+    {
+        log_error("comm", "Polling error");
+
         return -1;
     }
+    else
+    {
+        status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
+        
+        if(status < 0)
+        {
+            return -1;
+        }
 
-    return 0;
+        return 0;
+    }
 }
 
 int __send_ack(struct sockaddr_in *server_sockaddr)
 {
+    log_debug("comm", "Sending ack!");
+
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_ACK;
@@ -484,7 +487,7 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
 
     if(__send_packet(server_sockaddr, &packet) != 0)
     {
-        log_error("comm", "Ack could not be sent");
+        log_error("comm", "Ack could not be sent!");
 
         return -1;
     }
@@ -494,61 +497,88 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
 
 int __receive_ack(struct sockaddr_in *server_sockaddr)
 {
+    log_debug("comm", "Receiving ack!");
+
     struct comm_packet packet;
+    int status = __receive_packet(server_sockaddr, &packet);
 
-    if(__receive_packet(server_sockaddr, &packet) != 0)
+    if(status == 0)
     {
-        log_error("comm", "Could not receive an ack");
+        if(packet.type != COMM_PTYPE_ACK)
+        {
+            log_error("comm", "The received packet is not an ack.");
 
-        return -1;
+            return -1;
+        }
     }
 
-    if(packet.type != COMM_PTYPE_ACK)
-    {
-        log_error("comm", "The received packet is not an ack");
-
-        return -1;
-    }
-
-    return 0;
+    return status;
 }
 
 int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
+    log_debug("comm", "Sending data!");
+
     packet->type = COMM_PTYPE_DATA;
 
     if(__send_packet(server_sockaddr, packet) != 0)
     {
-        log_error("comm", "Data could not be sent");
+        log_error("comm", "Data could not be sent. Trying again!");
 
         return -1;
     }
+    
+    int status = __receive_ack(server_sockaddr);
 
-    return __receive_ack(server_sockaddr);
+    while(status == COMM_ERROR_TIMEOUT)
+    {
+        log_error("comm", "Data was not received by the destinatary. Trying again!");
+        __send_packet(server_sockaddr, packet);
+        status = __receive_ack(server_sockaddr);
+    }
+
+    return status;
 }
 
 int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
 {
-    if(__receive_packet(server_sockaddr, packet) != 0)
+    log_debug("comm", "Receiving data!");
+
+    int status = __receive_packet(server_sockaddr, packet);
+    int isValidPacket = packet->type == COMM_PTYPE_DATA;
+
+    while(status == COMM_ERROR_TIMEOUT || !isValidPacket)
     {
-        log_error("comm", "Could not receive the data");
+        log_error("comm", "Not received valid packet. Trying again!");
 
-        return -1;
+        status = __receive_packet(server_sockaddr, packet);
+        
+        if(status == 0)
+        {
+            if(packet->type == COMM_PTYPE_DATA)
+            {
+                isValidPacket = 1;
+            }
+            else
+            {
+                log_error("comm", "The received packet is not data. Trying again!");
+
+                isValidPacket = 0;
+            }
+        }
+        else if(status == -1)
+        {
+            return -1;
+        }
     }
-
-    if( packet->type != COMM_PTYPE_DATA )
-    {
-        log_error("comm", "The received packet is not a data");
-
-        return -1;
-    }
-
-
+    
     return __send_ack(server_sockaddr);
 }
 
 int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
+    log_debug("comm", "Sending command!");
+
     struct comm_packet packet;
 
     packet.type = COMM_PTYPE_CMD;
@@ -560,31 +590,55 @@ int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
 
     if(__send_packet(server_sockaddr, &packet) != 0)
     {
-        log_error("comm", "Command '%s' could not be sent", buffer);
+        log_error("comm", "Command could not be sent. Trying again!");
 
         return -1;
     }
+    
+    int status = __receive_ack(server_sockaddr);
 
+    while(status == COMM_ERROR_TIMEOUT)
+    {
+        log_error("comm", "Command was not received by the destinatary. Trying again!");
+        __send_packet(server_sockaddr, &packet);
+        status = __receive_ack(server_sockaddr);
+    }
 
-    return __receive_ack(server_sockaddr);
+    return status;
 }
 
 int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
 {
+    log_debug("comm", "Receiving command!");
+
     struct comm_packet packet;
 
-    if(__receive_packet(server_sockaddr, &packet) != 0)
+    int status = __receive_packet(server_sockaddr, &packet);
+    int isValidPacket = packet.type == COMM_PTYPE_CMD;
+
+    while(status == COMM_ERROR_TIMEOUT || !isValidPacket)
     {
-        log_error("comm", "Could not receive the command");
+        log_error("comm", "Not received valid packet. Trying again!");
 
-        return -1;
-    }
+        status = __receive_packet(server_sockaddr, &packet);
 
-    if( packet.type != COMM_PTYPE_CMD )
-    {
-        log_error("comm", "The received packet is not a command");
+        if(status == 0)
+        {
+            if(packet.type == COMM_PTYPE_CMD)
+            {
+                isValidPacket = 1;
+            }
+            else
+            {
+                log_error("comm", "The received packet is not command. Trying again!");
 
-        return -1;
+                isValidPacket = 0;
+            }
+        }
+        else if(status == -1)
+        {
+            return -1;
+        }
     }
 
     bzero(buffer, COMM_PPAYLOAD_LENGTH);
@@ -593,7 +647,7 @@ int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAY
     return __send_ack(server_sockaddr);
 }
 
-int __send_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
+int __send_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
 {
     FILE *file = NULL;
     int i;
@@ -626,7 +680,7 @@ int __send_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
     return 0;
 }
 
-int __receive_file(struct sockaddr_in *sockaddr, char path[MAX_PATH_LENGTH])
+int __receive_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
 {
     FILE *file = NULL;
     int i;
