@@ -328,7 +328,7 @@ void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent 
 {
     server_sockaddr->sin_family = AF_INET;
 	server_sockaddr->sin_port = htons(port);
-	server_sockaddr->sin_addr = *((struct in_addr *) server->h_addr);
+	server_sockaddr->sin_addr = *((struct in_addr *) server->h_addr_list[0]);
 	bzero((void *) &(server_sockaddr->sin_zero), sizeof(server_sockaddr->sin_zero));
 }
 
