@@ -17,19 +17,15 @@
 
 pthread_mutex_t __command_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int __socket_instance;
 struct sockaddr_in __server_sockaddr;
+struct comm_entity __server_entity;
 
-int __send_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
-int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
-int __send_ack(struct sockaddr_in *server_sockaddr);
-int __receive_ack(struct sockaddr_in *server_sockaddr);
-int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
-int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet);
-int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH]);
-int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH]);
-int __send_file(struct sockaddr_in *server_sockaddr, char path[FILE_PATH_LENGTH]);
-int __receive_file(struct sockaddr_in *server_sockaddr, char path[FILE_PATH_LENGTH]);
+int __send_data(struct comm_entity *from, struct comm_packet *packet);
+int __receive_data(struct comm_entity *from, struct comm_packet *packet);
+int __send_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH]);
+int __receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH]);
+int __send_file(struct comm_entity *to, char path[FILE_PATH_LENGTH]);
+int __receive_file(struct comm_entity *from, char path[FILE_PATH_LENGTH]);
 
 int __command_run(COMM_COMMAND command, struct comm_command_args *args)
 {
@@ -53,9 +49,9 @@ int __command_download(struct comm_command_args *args)
 
     file_path(dest, file, path, FILE_PATH_LENGTH);
 
-    if(__send_command(&__server_sockaddr, download_command) == 0)
+    if(__send_command(&(__server_entity), download_command) == 0)
     {
-        if(__receive_file(&__server_sockaddr, path) == 0)
+        if(__receive_file(&(__server_entity), path) == 0)
         {
             log_debug("comm", "'%s' downloaded", file);
 
@@ -95,9 +91,9 @@ int __command_upload(struct comm_command_args *args)
 
     sprintf(upload_command, "upload %s", filename);
 
-    if(__send_command(&__server_sockaddr, upload_command) == 0)
+    if(__send_command(&(__server_entity), upload_command) == 0)
     {
-        if(__send_file(&__server_sockaddr, path) == 0)
+        if(__send_file(&(__server_entity), path) == 0)
         {
             log_debug("comm", "'%s' uploaded into '%s'", path, filename);
 
@@ -127,7 +123,7 @@ int __command_delete(struct comm_command_args *args)
     bzero(delete_command, COMM_PPAYLOAD_LENGTH);
     sprintf(delete_command, "delete %s", file);
 
-    if(__send_command(&__server_sockaddr, delete_command) == 0)
+    if(__send_command(&(__server_entity), delete_command) == 0)
     {
         log_debug("comm", "'%s' removed", file);
 
@@ -162,13 +158,13 @@ int __command_check_sync(struct comm_command_args *args)
     bzero(file, FILE_NAME_LENGTH);
     struct comm_packet packet;
 
-    if(__send_command(&__server_sockaddr, sync_command) != 0)
+    if(__send_command(&(__server_entity), sync_command) != 0)
     {
         log_error("comm", "Could not send the synchronize command!");
     }
     else
     {
-        if(__receive_data(&__server_sockaddr, &packet) == 0)
+        if(__receive_data(&(__server_entity), &packet) == 0)
         {
             if(strlen(packet.payload) > 6)
             {
@@ -256,7 +252,7 @@ int __command_get_sync_dir(struct comm_command_args *args)
 {
     char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
 
-    if(__send_command(&__server_sockaddr, get_sync_dir_command) != 0)
+    if(__send_command(&(__server_entity), get_sync_dir_command) != 0)
     {
         log_error("comm", "Send command get_sync_dir error!");
     }
@@ -266,7 +262,7 @@ int __command_get_sync_dir(struct comm_command_args *args)
         bzero(temp_file, FILE_NAME_LENGTH);
         strcat(temp_file, "temp.txt");
 
-        if(__receive_file(&__server_sockaddr, temp_file) == 0)
+        if(__receive_file(&(__server_entity), temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
@@ -292,11 +288,11 @@ int __command_list_server(struct comm_command_args *args)
 {
     char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
 
-    if(__send_command(&__server_sockaddr, list_server_command) == 0)
+    if(__send_command(&(__server_entity), list_server_command) == 0)
     {
         char temp_file[FILE_NAME_LENGTH] = "temp.txt";
 
-        if(__receive_file(&__server_sockaddr, temp_file) == 0)
+        if(__receive_file(&(__server_entity), temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
@@ -337,7 +333,7 @@ void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent 
 	bzero((void *) &(server_sockaddr->sin_zero), sizeof(server_sockaddr->sin_zero));
 }
 
-int __login(struct sockaddr_in *tmp_sockaddr, char* username)
+int __login(struct comm_entity *entity, char* username)
 {
     char login_command[COMM_PPAYLOAD_LENGTH];
     struct comm_packet packet;
@@ -345,9 +341,9 @@ int __login(struct sockaddr_in *tmp_sockaddr, char* username)
 
     sprintf(login_command, "login %s", username);
 
-    if(__send_command(tmp_sockaddr, login_command) == 0)
+    if(__send_command(entity, login_command) == 0)
     {
-        if(__receive_data(tmp_sockaddr, &packet) == 0)
+        if(__receive_data(entity, &packet) == 0)
         {
             port = atoi(packet.payload);
 
@@ -362,12 +358,11 @@ int __login(struct sockaddr_in *tmp_sockaddr, char* username)
 
 int comm_init(char* username, char *host, int port)
 {
-    struct sockaddr_in tmp_sockaddr;
-	struct hostent *hostent;
+    struct hostent *hostent;
     int tmp_port = port;
     int new_port;
 
-    if((__socket_instance = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+    if((__server_entity.socket_instance = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
     {
 		log_error("comm", "Could not create socket instance");
 
@@ -378,22 +373,25 @@ int comm_init(char* username, char *host, int port)
     {
         log_error("comm", "Could not find the '%s' host", host);
 
-        close(__socket_instance);
+        close(__server_entity.socket_instance);
+
         return -1;
     }
 
-	__server_init_sockaddr(&tmp_sockaddr, hostent, tmp_port);
+    __server_entity.sockaddr = &__server_sockaddr;
 
-    new_port = __login(&tmp_sockaddr, username);
+    __server_init_sockaddr(__server_entity.sockaddr, hostent, tmp_port);
+
+    new_port = __login(&(__server_entity), username);
 
     if(new_port != -1)
     {
-        __server_init_sockaddr(&__server_sockaddr, hostent, new_port);
+        __server_init_sockaddr(__server_entity.sockaddr, hostent, new_port);
 
         return 0;
     }
 
-    close(__socket_instance);
+    close(__server_entity.socket_instance);
 
     return -1;
 }
@@ -405,9 +403,9 @@ int __command_logout(struct comm_command_args *args)
     bzero(logout_command, COMM_PPAYLOAD_LENGTH);
     sprintf(logout_command, "logout");
 
-    if(__send_command(&__server_sockaddr, logout_command) == 0)
+    if(__send_command(&(__server_entity), logout_command) == 0)
     {
-        close(__socket_instance);
+        close(__server_entity.socket_instance);
 
         return 0;
     }
@@ -422,50 +420,49 @@ int comm_stop()
     return __command_run(command, NULL);
 }
 
-int __send_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
+int __send_packet(struct comm_entity *to, struct comm_packet *packet)
 {
-    int status;
-
-    status = sendto(__socket_instance, (void *)packet, sizeof(struct comm_packet), 0, (struct sockaddr *)server_sockaddr, sizeof(struct sockaddr));
+    int status = sendto(to->socket_instance, (void *)packet, sizeof(struct comm_packet), 0, (struct sockaddr *)to->sockaddr, sizeof(struct sockaddr));
 
     if(status < 0)
     {
+        log_error("comm", "Socket: %d, No packet could be sent", to->socket_instance);
+
         return -1;
     }
 
     return 0;
 }
 
-int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
+int __receive_packet(struct comm_entity *to, struct comm_packet *packet)
 {
-    int status;
-    struct sockaddr_in from;
-    socklen_t from_length = sizeof(struct sockaddr_in);
     struct pollfd fd;
-    int res;
-
-    fd.fd = __socket_instance;
+    fd.fd = to->socket_instance;
     fd.events = POLLIN;
 
-    res = poll(&fd, 1, COMM_TIMEOUT);
-    if(res == 0)
+    int poll_status = poll(&fd, 1, COMM_TIMEOUT);
+
+    if(poll_status == 0)
     {
-        log_error("comm", "Connection timed out");
+        log_error("comm", "Socket: %d, Connection timed out", to->socket_instance);
 
         return COMM_ERROR_TIMEOUT;
     }
-    else if(res == -1)
+    else if(poll_status == -1)
     {
-        log_error("comm", "Polling error");
+        log_error("comm", "Socket: %d, Polling error");
 
         return -1;
     }
     else
     {
-        status = recvfrom(__socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&from, &from_length);
-        
+        socklen_t from_length = sizeof(struct sockaddr_in);
+        int status = recvfrom(to->socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)to->sockaddr, &from_length);
+
         if(status < 0)
         {
+            log_error("comm", "Socket: %d, No packet was received");
+
             return -1;
         }
 
@@ -473,9 +470,9 @@ int __receive_packet(struct sockaddr_in *server_sockaddr, struct comm_packet *pa
     }
 }
 
-int __send_ack(struct sockaddr_in *server_sockaddr)
+int __send_ack(struct comm_entity *to)
 {
-    log_debug("comm", "Sending ack!");
+    log_debug("comm", "Socket: %d, Sending ack!", to->socket_instance);
 
     struct comm_packet packet;
 
@@ -485,9 +482,9 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
     packet.length = 0;
     packet.total_size = 1;
 
-    if(__send_packet(server_sockaddr, &packet) != 0)
+    if(__send_packet(to, &packet) != 0)
     {
-        log_error("comm", "Ack could not be sent!");
+        log_error("comm", "Socket: %d, Ack could not be sent!", to->socket_instance);
 
         return -1;
     }
@@ -495,18 +492,18 @@ int __send_ack(struct sockaddr_in *server_sockaddr)
     return 0;
 }
 
-int __receive_ack(struct sockaddr_in *server_sockaddr)
+int __receive_ack(struct comm_entity *from)
 {
-    log_debug("comm", "Receiving ack!");
+    log_debug("comm", "Socket: %d, Receiving ack!", from->socket_instance);
 
     struct comm_packet packet;
-    int status = __receive_packet(server_sockaddr, &packet);
+    int status = __receive_packet(from, &packet);
 
     if(status == 0)
     {
         if(packet.type != COMM_PTYPE_ACK)
         {
-            log_error("comm", "The received packet is not an ack.");
+            log_error("comm", "Socket: %d, The received packet is not an ack.", from->socket_instance);
 
             return -1;
         }
@@ -515,69 +512,148 @@ int __receive_ack(struct sockaddr_in *server_sockaddr)
     return status;
 }
 
-int __send_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
+int __is_packet_already_in_buffer(struct comm_entity *entity, struct comm_packet *packet)
 {
-    log_debug("comm", "Sending data!");
+    struct comm_packet *last_packet = &(entity->buffer[entity->idx_buffer]);
 
-    packet->type = COMM_PTYPE_DATA;
+    return
+    (
+        (last_packet->type == packet->type) &&
+        (last_packet->seqn == packet->seqn) &&
+        (last_packet->length == packet->length) &&
+        (last_packet->total_size == packet->total_size) &&
+        (strcmp(last_packet->payload, packet->payload) == 0)
+    );
+}
 
-    if(__send_packet(server_sockaddr, packet) != 0)
+int __save_packet_in_buffer(struct comm_entity *entity, struct comm_packet *packet)
+{
+    if(entity->idx_buffer == (COMM_RECEIVE_BUFFER_LENGTH - 1))
     {
-        log_error("comm", "Data could not be sent. Trying again!");
+        log_error("comm", "Socket %d, buffer is full!", entity->socket_instance);
 
         return -1;
     }
     
-    int status = __receive_ack(server_sockaddr);
+    entity->idx_buffer = entity->idx_buffer + 1;
+    memcpy(&(entity->buffer[entity->idx_buffer]), packet, sizeof(struct comm_packet));
 
-    while(status == COMM_ERROR_TIMEOUT)
+    return 0;
+ }
+
+int __get_packet_in_buffer(struct comm_entity *entity, struct comm_packet *packet)
+{
+    if(entity->idx_buffer == -1)
     {
-        log_error("comm", "Data was not received by the destinatary. Trying again!");
-        __send_packet(server_sockaddr, packet);
-        status = __receive_ack(server_sockaddr);
-    }
+        log_error("comm", "Socket %d, buffer is empty!", entity->socket_instance);
 
-    return status;
+        return -1;
+    }
+    
+    memcpy(packet, &(entity->buffer[entity->idx_buffer]), sizeof(struct comm_packet));
+    entity->idx_buffer = entity->idx_buffer - 1;
+
+    return 0;
 }
 
-int __receive_data(struct sockaddr_in *server_sockaddr, struct comm_packet *packet)
+int __reliable_send_packet(struct comm_entity *to, struct comm_packet *packet)
 {
-    log_debug("comm", "Receiving data!");
+    int status = -1;
+    int ack_status = -1;
 
-    int status = __receive_packet(server_sockaddr, packet);
-    int isValidPacket = packet->type == COMM_PTYPE_DATA;
-
-    while(status == COMM_ERROR_TIMEOUT || !isValidPacket)
+    do
     {
-        log_error("comm", "Not received valid packet. Trying again!");
+        status = __send_packet(to, packet);
 
-        status = __receive_packet(server_sockaddr, packet);
-        
-        if(status == 0)
-        {
-            if(packet->type == COMM_PTYPE_DATA)
-            {
-                isValidPacket = 1;
-            }
-            else
-            {
-                log_error("comm", "The received packet is not data. Trying again!");
-
-                isValidPacket = 0;
-            }
-        }
-        else if(status == -1)
+        if(status != 0)
         {
             return -1;
         }
-    }
-    
-    return __send_ack(server_sockaddr);
+
+        ack_status = __receive_ack(to);
+
+    } while(ack_status == COMM_ERROR_TIMEOUT);
+
+    return ack_status;
 }
 
-int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
+int __reliable_receive_packet(struct comm_entity *from)
 {
-    log_debug("comm", "Sending command!");
+    struct comm_packet packet;
+    int status = -1;
+
+    do
+    {
+        status = __receive_packet(from, &packet);
+
+    } while(status == COMM_ERROR_TIMEOUT);
+
+    if(!__is_packet_already_in_buffer(from, &packet))
+    {
+        if(__save_packet_in_buffer(from, &packet) == 0)
+        {
+            if(__send_ack(from) == 0)
+            {
+                return 0;
+            }
+        }
+    }
+    else
+    {
+        if(__send_ack(from) == 0)
+        {
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int __send_data(struct comm_entity *to, struct comm_packet *packet)
+{
+    log_debug("comm", "Socket: %d, Sending data!", to->socket_instance);
+
+    packet->type = COMM_PTYPE_DATA;
+
+    if(__reliable_send_packet(to, packet) != 0)
+    {
+        log_error("comm", "Socket: %d, Data could not be sent.", to->socket_instance);
+
+        return -1;
+    }
+
+    return 0;
+}
+
+int __receive_data(struct comm_entity *from, struct comm_packet *packet)
+{
+    log_debug("comm", "Socket: %d, Receiving data!", from->socket_instance);
+
+    if(__reliable_receive_packet(from) != 0)
+    {
+        log_error("comm", "Socket: %d, No data could be received.", from->socket_instance);
+
+        return -1;
+    }
+
+    if(__get_packet_in_buffer(from, packet) != 0)
+    {
+        return -1;
+    }
+
+    if(packet->type != COMM_PTYPE_DATA)
+    {
+        log_error("comm", "Socket: %d, The received packet is not data.", from->socket_instance);
+
+        return -1;
+    }
+
+    return 0;
+}
+
+int __send_command(struct comm_entity *to, char buffer[COMM_PPAYLOAD_LENGTH])
+{
+    log_debug("comm", "Socket: %d, Sending command!", to->socket_instance);
 
     struct comm_packet packet;
 
@@ -588,66 +664,48 @@ int __send_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOA
     bzero(packet.payload, COMM_PPAYLOAD_LENGTH);
     strncpy(packet.payload, buffer, strlen(buffer));
 
-    if(__send_packet(server_sockaddr, &packet) != 0)
+    if(__reliable_send_packet(to, &packet) != 0)
     {
-        log_error("comm", "Command could not be sent. Trying again!");
+        log_error("comm", "Socket: %d, Command could not be sent.", to->socket_instance);
 
         return -1;
     }
-    
-    int status = __receive_ack(server_sockaddr);
 
-    while(status == COMM_ERROR_TIMEOUT)
-    {
-        log_error("comm", "Command was not received by the destinatary. Trying again!");
-        __send_packet(server_sockaddr, &packet);
-        status = __receive_ack(server_sockaddr);
-    }
-
-    return status;
+    return 0;
 }
 
-int __receive_command(struct sockaddr_in *server_sockaddr, char buffer[COMM_PPAYLOAD_LENGTH])
+int __receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH])
 {
-    log_debug("comm", "Receiving command!");
+    log_debug("comm", "Socket: %d, Receiving command!", from->socket_instance);
 
     struct comm_packet packet;
 
-    int status = __receive_packet(server_sockaddr, &packet);
-    int isValidPacket = packet.type == COMM_PTYPE_CMD;
-
-    while(status == COMM_ERROR_TIMEOUT || !isValidPacket)
+    if(__reliable_receive_packet(from) != 0)
     {
-        log_error("comm", "Not received valid packet. Trying again!");
+        log_error("comm", "Socket: %d, No command could be received.", from->socket_instance);
 
-        status = __receive_packet(server_sockaddr, &packet);
+        return -1;
+    }
 
-        if(status == 0)
-        {
-            if(packet.type == COMM_PTYPE_CMD)
-            {
-                isValidPacket = 1;
-            }
-            else
-            {
-                log_error("comm", "The received packet is not command. Trying again!");
+    if(__get_packet_in_buffer(from, &packet) != 0)
+    {
+        return -1;
+    }
 
-                isValidPacket = 0;
-            }
-        }
-        else if(status == -1)
-        {
-            return -1;
-        }
+    if(packet.type != COMM_PTYPE_CMD)
+    {
+        log_error("comm", "Socket: %d, The received packet is not command.", from->socket_instance);
+
+        return -1;
     }
 
     bzero(buffer, COMM_PPAYLOAD_LENGTH);
     strncpy(buffer, packet.payload, packet.length);
 
-    return __send_ack(server_sockaddr);
+    return 0;
 }
 
-int __send_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
+int __send_file(struct comm_entity *to, char path[FILE_PATH_LENGTH])
 {
     FILE *file = NULL;
     int i;
@@ -656,7 +714,7 @@ int __send_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
 
     if(file == NULL)
     {
-        log_error("comm", "Could not open the file in '%s'", path);
+        log_error("comm", "Socket: %d, Could not open the file in '%s'", to->socket_instance, path);
 
         return -1;
     }
@@ -673,14 +731,14 @@ int __send_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
         packet.total_size = num_packets;
         packet.seqn = i;
 
-        __send_data(sockaddr, &packet);
+        __send_data(to, &packet);
     }
 
     fclose(file);
     return 0;
 }
 
-int __receive_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
+int __receive_file(struct comm_entity *from, char path[FILE_PATH_LENGTH])
 {
     FILE *file = NULL;
     int i;
@@ -690,18 +748,18 @@ int __receive_file(struct sockaddr_in *sockaddr, char path[FILE_PATH_LENGTH])
 
     if(file == NULL)
     {
-        log_error("comm", "Could not open the file in '%s'", path);
+        log_error("comm", "Socket: %d, Could not open the file in '%s'", from->socket_instance, path);
 
         return -1;
     }
 
-    if(__receive_data(sockaddr, &packet) == 0)
+    if(__receive_data(from, &packet) == 0)
     {
         file_write_bytes(file, packet.payload, packet.length);
 
         for(i = 1; i < packet.total_size; i++)
         {
-            __receive_data(sockaddr, &packet);
+            __receive_data(from, &packet);
             file_write_bytes(file, packet.payload, packet.length);
         }
 

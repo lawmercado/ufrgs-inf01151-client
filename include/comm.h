@@ -6,6 +6,7 @@
 
 #define COMM_TIMEOUT 20000
 #define COMM_ERROR_TIMEOUT -2
+#define COMM_RECEIVE_BUFFER_LENGTH 10
 
 #define COMM_PPAYLOAD_LENGTH 512
 #define COMM_PTYPE_DATA 0
@@ -20,6 +21,13 @@ struct comm_packet {
     uint32_t total_size; // Number of fragments
     uint16_t length; // Payload length
     char payload[COMM_PPAYLOAD_LENGTH];
+};
+
+struct comm_entity {
+    int socket_instance;
+    struct sockaddr_in *sockaddr;
+    struct comm_packet buffer[COMM_RECEIVE_BUFFER_LENGTH];
+    int idx_buffer;
 };
 
 struct comm_command_args {
