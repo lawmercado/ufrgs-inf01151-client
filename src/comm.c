@@ -17,7 +17,6 @@
 
 pthread_mutex_t __command_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct sockaddr_in __server_sockaddr;
 struct comm_entity __server_entity;
 
 int __send_data(struct comm_entity *from, struct comm_packet *packet);
@@ -378,15 +377,13 @@ int comm_init(char* username, char *host, int port)
         return -1;
     }
 
-    __server_entity.sockaddr = &__server_sockaddr;
-
-    __server_init_sockaddr(__server_entity.sockaddr, hostent, tmp_port);
+    __server_init_sockaddr(&(__server_entity.sockaddr), hostent, tmp_port);
 
     new_port = __login(&(__server_entity), username);
 
     if(new_port != -1)
     {
-        __server_init_sockaddr(__server_entity.sockaddr, hostent, new_port);
+        __server_init_sockaddr(&(__server_entity.sockaddr), hostent, new_port);
 
         return 0;
     }
@@ -422,7 +419,7 @@ int comm_stop()
 
 int __send_packet(struct comm_entity *to, struct comm_packet *packet)
 {
-    int status = sendto(to->socket_instance, (void *)packet, sizeof(struct comm_packet), 0, (struct sockaddr *)to->sockaddr, sizeof(struct sockaddr));
+    int status = sendto(to->socket_instance, (void *)packet, sizeof(struct comm_packet), 0, (struct sockaddr *)&(to->sockaddr), sizeof(struct sockaddr));
 
     if(status < 0)
     {
@@ -457,7 +454,7 @@ int __receive_packet(struct comm_entity *to, struct comm_packet *packet)
     else
     {
         socklen_t from_length = sizeof(struct sockaddr_in);
-        int status = recvfrom(to->socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)to->sockaddr, &from_length);
+        int status = recvfrom(to->socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&(to->sockaddr), &from_length);
 
         if(status < 0)
         {
@@ -536,7 +533,7 @@ int __save_packet_in_buffer(struct comm_entity *entity, struct comm_packet *pack
     }
     
     entity->idx_buffer = entity->idx_buffer + 1;
-    memcpy(&(entity->buffer[entity->idx_buffer]), packet, sizeof(struct comm_packet));
+    entity->buffer[entity->idx_buffer] = *packet;
 
     return 0;
  }
@@ -550,7 +547,7 @@ int __get_packet_in_buffer(struct comm_entity *entity, struct comm_packet *packe
         return -1;
     }
     
-    memcpy(packet, &(entity->buffer[entity->idx_buffer]), sizeof(struct comm_packet));
+    *packet = entity->buffer[entity->idx_buffer];
     entity->idx_buffer = entity->idx_buffer - 1;
 
     return 0;
