@@ -54,16 +54,6 @@ void __watcher_handle_event(struct inotify_event *event)
                     comm_upload(path);
                 }
             }
-            else if(event->mask & IN_CREATE)
-            {
-                if(!(event->mask & IN_ISDIR))
-                {
-                    log_debug("sync", "'%s' created", event->name);
-
-                    file_path(__watched_dir_path, event->name, path, FILE_PATH_LENGTH);
-                    comm_upload(path);
-                }
-            }
             else if(event->mask & IN_MOVED_TO)
             {
                 if(!(event->mask & IN_ISDIR))
@@ -224,7 +214,7 @@ int sync_watcher_init(char *dir_path)
     }
 
     // Adding the specified directory into watch list
-    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MODIFY | IN_CREATE | IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM);
+    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM | IN_MODIFY);
 
     // Checking for error
     if(__inotify_dir_watcher < 0)
@@ -311,7 +301,7 @@ int sync_delete_file(char name[FILE_NAME_LENGTH])
 
     if(file_delete(path) != 0)
     {
-        log_error("sync", "Could not delete the file");
+        log_error("sync", "Could not delete the file: does it exists?");
 
         return -1;
     }

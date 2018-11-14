@@ -160,10 +160,10 @@ void download(char *file)
 
 void delete(char *file)
 {
-    if(comm_delete(file) == 0)
+    if(sync_delete_file(file) == 0)
     {
-        if(sync_delete_file(file) == 0)
-        {
+        if(comm_delete(file) == 0)
+        {   
             fprintf(stderr, "File deleted!\n");
         }
     }
@@ -182,8 +182,6 @@ void list_client()
 void get_sync_dir()
 {
     fprintf(stderr, "Syncing your directory... ");
-    sync_watcher_stop();
     comm_get_sync_dir();
-    sync_watcher_init("sync_dir");
     fprintf(stderr, "Done!\n");
 }
