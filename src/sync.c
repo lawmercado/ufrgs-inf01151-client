@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <dirent.h>
 #include <string.h>
+#include <poll.h>
 #include <sys/inotify.h>
 #include "sync.h"
 #include "file.h"
@@ -35,7 +36,6 @@ char* __watched_dir_path;
 void __watcher_handle_event(struct inotify_event *event)
 {
     pthread_mutex_lock(&__event_handling_mutex);
-    __is_event_processing = 1;
 
     char path[FILE_PATH_LENGTH];
 
@@ -44,13 +44,14 @@ void __watcher_handle_event(struct inotify_event *event)
         // Ignoring hidden files
         if(event->name[0] != '.')
         {
-            if(event->mask & IN_MODIFY)
+            if(event->mask & IN_CLOSE_WRITE)
             {
                 if(!(event->mask & IN_ISDIR))
                 {
-                    log_debug("sync", "'%s' modified", event->name);
+                    log_debug("sync", "'%s' closed", event->name);
 
                     file_path(__watched_dir_path, event->name, path, FILE_PATH_LENGTH);
+
                     comm_upload(path);
                 }
             }
@@ -83,8 +84,6 @@ void __watcher_handle_event(struct inotify_event *event)
         }
     }
 
-    __is_event_processing = 0;
-    pthread_cond_signal(&__events_done_processing);
     pthread_mutex_unlock(&__event_handling_mutex);
 }
 
@@ -109,32 +108,44 @@ void *__watcher()
 {
     char buffer[EVENT_BUF_LEN];
     int length, idx_event = 0;
+    struct pollfd fd;
+    fd.fd = __inotify_instance;
+    fd.events = POLLIN;
 
     while(!__stop_event_handling)
     {
-        // Reads an event change happens on the directory
-        length = read(__inotify_instance, buffer, EVENT_BUF_LEN);
+        int poll_status = poll(&fd, 1, SYNC_READ_TIMEOUT);
 
-        if(length > 0)
+        if(poll_status == 0)
         {
-            idx_event = 0;
+            log_debug("sync", "Nothing to read");
+        }
+        else if(poll_status == -1)
+        {
+            log_error("sync", "Error while trying to read");
+        }
+        else
+        {
+            // Reads an event change happens on the directory
+            length = read(__inotify_instance, buffer, EVENT_BUF_LEN);
 
-            // Read list of change events happened. Reads the change event one by one and process it accordingly
-            while(idx_event < length)
+            if(length > 0)
             {
-                struct inotify_event *event = (struct inotify_event *) &buffer[ idx_event ];
+                idx_event = 0;
 
-                __watcher_handle_event(event);
+                // Read list of change events happened. Reads the change event one by one and process it accordingly
+                while(idx_event < length)
+                {
+                    struct inotify_event *event = (struct inotify_event *) &buffer[idx_event];
 
-                idx_event += EVENT_SIZE + event->len;
+                    __watcher_handle_event(event);
+
+                    idx_event += EVENT_SIZE + event->len;
+                }
             }
         }
-
-        // To avoid excessive monitoring
-        // TODO: test if this line really works in every computer
-        sleep(1);
     }
-
+    
     pthread_exit(NULL);
 }
 
@@ -143,8 +154,8 @@ void *__check_for_sync()
     while(!__stop_synchronizer)
     {
         comm_check_sync();
-
-        sleep(1);
+        
+        sleep(5);
     }
 
     pthread_exit(NULL);
@@ -202,7 +213,7 @@ int sync_stop()
 int sync_watcher_init(char *dir_path)
 {
     __watched_dir_path = dir_path;
-    __inotify_instance = inotify_init1(IN_NONBLOCK);
+    __inotify_instance = inotify_init();
     __stop_event_handling = 0;
 
     // Checking for error
@@ -214,7 +225,7 @@ int sync_watcher_init(char *dir_path)
     }
 
     // Adding the specified directory into watch list
-    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM | IN_MODIFY);
+    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM | IN_CLOSE_WRITE);
 
     // Checking for error
     if(__inotify_dir_watcher < 0)
@@ -242,16 +253,7 @@ int sync_watcher_init(char *dir_path)
  */
 void sync_watcher_stop()
 {
-    pthread_mutex_lock(&__event_handling_mutex);
-
-    while(__is_event_processing)
-    {
-        pthread_cond_wait(&__events_done_processing, &__event_handling_mutex);
-    }
-
     __stop_event_handling = 1;
-
-    pthread_mutex_unlock(&__event_handling_mutex);
 
     pthread_join(__watcher_thread, NULL);
 

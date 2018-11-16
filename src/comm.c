@@ -179,7 +179,7 @@ int __command_check_sync(struct comm_command_args *args)
 
                     sync_watcher_stop();
                     __command_download(&downloadArgs);
-                    sync_watcher_init("sync_dir");
+                    sync_watcher_init("sync_dir/");
                 }
                 else if(strcmp(operation, "delete") == 0)
                 {

@@ -103,12 +103,12 @@ int main(int argc, char** argv)
     }
 
     sync_setup("sync_dir");
-
+    
     if(sync_watcher_init("sync_dir") != 0)
     {
         exit(1);
     }
-
+    
     get_sync_dir();
 
     if(sync_init() != 0)

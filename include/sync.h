@@ -1,6 +1,8 @@
 #ifndef __SYNC_H__
 #define __SYNC_H__
 
+#define SYNC_READ_TIMEOUT 1000
+
 int sync_init();
 
 int sync_setup(char *dir_path);
