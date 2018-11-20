@@ -342,8 +342,10 @@ int comm_response_synchronize(char *file)
 
 int comm_init(struct comm_entity server_entity, struct comm_entity receiver_entity)
 {
+    pthread_mutex_lock(&__command_handling_mutex);
     __server_entity = server_entity;
     __frontend_entity = receiver_entity;
+    pthread_mutex_unlock(&__command_handling_mutex);
 
     return 0;
 }
