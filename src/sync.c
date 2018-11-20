@@ -16,17 +16,15 @@
 #define EVENT_BUF_LEN (1024 * (EVENT_SIZE + 16))
 
 pthread_t __watcher_thread;
-pthread_t __sync_checker_thread;
 pthread_mutex_t __event_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t __events_done_processing = PTHREAD_COND_INITIALIZER;
 int __is_event_processing = 0;
 int __stop_event_handling = 0;
-int __stop_synchronizer = 0;
 
 int __inotify_instance;
 int __inotify_dir_watcher;
 
-char* __watched_dir_path;
+char* __watched_dir_path = NULL;
 
 /**
  * Handle an inotify event
@@ -149,18 +147,6 @@ void *__watcher()
     pthread_exit(NULL);
 }
 
-void *__check_for_sync()
-{
-    while(!__stop_synchronizer)
-    {
-        comm_check_sync();
-        
-        sleep(5);
-    }
-
-    pthread_exit(NULL);
-}
-
 int __initialize_dir(char *dir_path)
 {
     if(file_exists(dir_path))
@@ -177,42 +163,13 @@ int __initialize_dir(char *dir_path)
 
 int sync_setup(char *dir_path)
 {
+    __watched_dir_path = dir_path;
+
     return __initialize_dir(dir_path);
 }
 
-int sync_init()
+int sync_watcher_init()
 {
-    __stop_synchronizer = 0;
-
-    if(pthread_create(&__sync_checker_thread, NULL, __check_for_sync, NULL) == -1)
-    {
-        log_error("sync", "Could not create the synchornizer thread");
-        return -1;
-    }
-
-    log_debug("sync", "Syncronizer initialized");
-
-    return 0;
-}
-
-int sync_stop()
-{
-    __stop_synchronizer = 1;
-
-    log_debug("sync", "Syncronizer stopped");
-
-    return 0;
-}
-
-/**
- * Initializes the synchronization in the specified directory to be synchronized
- *
- * @param char* dir_path The directory to be synchronized
- * @return 0 if no errors, -1 otherwise
- */
-int sync_watcher_init(char *dir_path)
-{
-    __watched_dir_path = dir_path;
     __inotify_instance = inotify_init();
     __stop_event_handling = 0;
 
@@ -225,12 +182,12 @@ int sync_watcher_init(char *dir_path)
     }
 
     // Adding the specified directory into watch list
-    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, dir_path, IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM | IN_CLOSE_WRITE);
+    __inotify_dir_watcher = inotify_add_watch(__inotify_instance, __watched_dir_path, IN_MOVED_TO | IN_DELETE | IN_MOVED_FROM | IN_CLOSE_WRITE);
 
     // Checking for error
     if(__inotify_dir_watcher < 0)
     {
-        log_error("sync", "Could not watch '%s': directory does not exists", dir_path);
+        log_error("sync", "Could not watch '%s': directory does not exists", __watched_dir_path);
 
         return -1;
     }
@@ -242,7 +199,7 @@ int sync_watcher_init(char *dir_path)
         return -1;
     }
 
-    log_debug("sync", "Synchronization process started");
+    log_debug("sync", "Synchronization process started on '%s'", __watched_dir_path);
 
     return 0;
 }
@@ -262,38 +219,6 @@ void sync_watcher_stop()
     log_debug("sync", "Synchronization process ended");
 }
 
-/**
- * Updates the file in the synchronized directory
- *
- * @param char* name The name of the file
- * @param char* buffer The content of the file
- * @param int length The buffer size of the file
- * @return 0 if no errors, -1 otherwise
- */
-int sync_update_file(char name[FILE_NAME_LENGTH], char *buffer, int length)
-{
-    sync_watcher_stop();
-
-    char path[FILE_PATH_LENGTH];
-    file_path(__watched_dir_path, name, path, FILE_PATH_LENGTH);
-
-    if(file_write_buffer(path, buffer, length) != 0)
-    {
-        log_error("sync", "Could not update the file '%s'", name);
-
-        return -1;
-    }
-
-    if(sync_watcher_init(__watched_dir_path) != 0)
-    {
-        log_error("sync", "Could not initialize the synchronization process");
-
-        return -1;
-    }
-
-    return 0;
-}
-
 int sync_delete_file(char name[FILE_NAME_LENGTH])
 {
     sync_watcher_stop();
@@ -308,7 +233,7 @@ int sync_delete_file(char name[FILE_NAME_LENGTH])
         return -1;
     }
 
-    if(sync_watcher_init(__watched_dir_path) != 0)
+    if(sync_watcher_init() != 0)
     {
         log_error("sync", "Could not initialize the synchronization process");
 

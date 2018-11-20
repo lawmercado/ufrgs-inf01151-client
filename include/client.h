@@ -4,16 +4,18 @@
 #define MAX_INPUT_LENGTH 400
 #define MAX_COMMAND_LENGTH 12
 
-void upload(char *file);
+void client_upload(char *file);
 
-void download(char *file);
+void client_download(char *file);
 
-void delete(char *file);
+void client_delete(char *file);
 
-void list_server();
+void client_list_server();
 
-void list_client();
+void client_list_client();
 
-void get_sync_dir();
+void client_get_sync_dir();
+
+int client_setup();
 
 #endif

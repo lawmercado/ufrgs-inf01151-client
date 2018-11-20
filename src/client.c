@@ -2,17 +2,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "client.h"
 #include "file.h"
 #include "comm.h"
 #include "sync.h"
 #include "log.h"
+#include "utils.h"
+
+struct comm_entity __server_entity;
+struct comm_entity __frontend_entity;
+pthread_t __frontend_thread;
 
 int __exit()
 {
     sync_watcher_stop();
-    sync_stop();
-    comm_stop();
+    comm_logout();
 
     return 0;
 }
@@ -31,7 +36,7 @@ int __handle_input(char* input)
     {
         if( strlen(file) > 0 )
         {
-            upload(file);
+            client_upload(file);
         }
         else
         {
@@ -42,7 +47,7 @@ int __handle_input(char* input)
     {
         if( strlen(file) > 0 )
         {
-            download(file);
+            client_download(file);
         }
         else
         {
@@ -53,7 +58,7 @@ int __handle_input(char* input)
     {
         if( strlen(file) > 0 )
         {
-            delete(file);
+            client_delete(file);
         }
         else
         {
@@ -62,15 +67,15 @@ int __handle_input(char* input)
     }
     else if(strcmp(command, "list_server") == 0)
     {
-        list_server();
+        client_list_server();
     }
     else if(strcmp(command, "list_client") == 0)
     {
-        list_client();
+        client_list_client();
     }
     else if(strcmp(command, "get_sync_dir") == 0)
     {
-        get_sync_dir();
+        client_get_sync_dir();
     }
     else if(strcmp(command, "exit") == 0)
     {
@@ -97,24 +102,12 @@ int main(int argc, char** argv)
 
     fprintf(stderr, "Initializing...\n");
 
-    if(comm_init(argv[1], argv[2], atoi(argv[3])) != 0)
+    if(client_setup(argv[1], argv[2], atoi(argv[3])) != 0)
     {
         exit(1);
     }
 
-    sync_setup("sync_dir");
-    
-    if(sync_watcher_init("sync_dir") != 0)
-    {
-        exit(1);
-    }
-    
-    get_sync_dir();
-
-    if(sync_init() != 0)
-    {
-        exit(1);
-    }
+    client_get_sync_dir();
 
     do
     {
@@ -128,7 +121,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void upload(char *file)
+void client_upload(char *file)
 {
     if(file_exists(file))
     {
@@ -148,7 +141,7 @@ void upload(char *file)
     }
 }
 
-void download(char *file)
+void client_download(char *file)
 {
     fprintf(stderr, "Downloading... ");
 
@@ -158,7 +151,7 @@ void download(char *file)
     }
 }
 
-void delete(char *file)
+void client_delete(char *file)
 {
     if(sync_delete_file(file) == 0)
     {
@@ -169,19 +162,135 @@ void delete(char *file)
     }
 }
 
-void list_server()
+void client_list_server()
 {
     comm_list_server();
 }
 
-void list_client()
+void client_list_client()
 {
     sync_list_files();
 }
 
-void get_sync_dir()
+void client_get_sync_dir()
 {
     fprintf(stderr, "Syncing your directory... ");
     comm_get_sync_dir();
     fprintf(stderr, "Done!\n");
+}
+
+int __handle_command(char *command)
+{
+    char operation[COMM_COMMAND_LENGTH], parameter[COMM_PARAMETER_LENGTH];
+
+    sscanf(command, "%s %[^\n\t]s", operation, parameter);
+
+    log_debug("comm", "Command read '%s %s'", operation, parameter);
+
+    if(strcmp(operation, "synchronize") == 0)
+    {
+        return comm_response_synchronize(parameter);
+    }
+    else if(strcmp(operation, "delete") == 0)
+    {
+        return sync_delete_file(parameter);
+    }
+
+    return 0;
+}
+
+void *__receive()
+{
+    while(1)
+    {
+        char command[COMM_COMMAND_LENGTH] = "";
+
+        bzero(command, COMM_COMMAND_LENGTH);
+
+        if(comm_receive_command(&__frontend_entity, command) == 0)
+        {
+            __handle_command(command);
+        }
+    }
+}
+
+int __setup_receiver()
+{
+    utils_init_sockaddr(&(__frontend_entity.sockaddr), 0, INADDR_ANY);
+    socklen_t length = sizeof(__frontend_entity.sockaddr);
+
+    __frontend_entity.socket_instance = utils_create_binded_socket(&(__frontend_entity.sockaddr));
+    __frontend_entity.idx_buffer = -1;
+
+    if(__frontend_entity.socket_instance == -1)
+    {
+        return -1;
+    }
+
+    getsockname(__frontend_entity.socket_instance, (struct sockaddr *)&(__frontend_entity.sockaddr), &length);
+
+    log_info("comm", "Client controller is socket %d %d", __frontend_entity.socket_instance, utils_get_port((struct sockaddr *)&(__frontend_entity.sockaddr)));
+
+    if(pthread_create(&__frontend_thread, NULL, __receive, NULL) != 0)
+    {
+
+    }
+
+    return 0;
+}
+
+int __setup_sender(char* username, char *host, int port)
+{
+    int tmp_port = port;
+    int new_port;
+
+    if((__server_entity.socket_instance = utils_create_socket()) == -1)
+    {
+		return -1;
+	}
+
+    if(utils_init_sockaddr_to_host(&(__server_entity.sockaddr), tmp_port, host) == -1)
+    {
+        return -1;
+    }
+
+    new_port = comm_login(&(__server_entity), username, utils_get_port((struct sockaddr *)&(__frontend_entity.sockaddr)));
+
+    if(new_port != -1)
+    {
+        utils_init_sockaddr_to_host(&(__server_entity.sockaddr), new_port, host);
+
+        return 0;
+    }
+
+    close(__server_entity.socket_instance);
+
+    return -1;
+}
+
+int client_setup(char* username, char *host, int port)
+{
+    if(__setup_receiver() == -1)
+    {
+        return -1;
+    }
+
+    if(__setup_sender(username, host, port) == -1)
+    {
+        return -1;
+    }
+
+    comm_init(__server_entity, __frontend_entity);
+
+    if(sync_setup("sync_dir") == -1)
+    {
+        return -1;
+    }
+    
+    if(sync_watcher_init() == -1)
+    {
+        return -1;
+    }
+
+    return 0;
 }

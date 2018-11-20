@@ -18,13 +18,7 @@
 pthread_mutex_t __command_handling_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct comm_entity __server_entity;
-
-int __send_data(struct comm_entity *from, struct comm_packet *packet);
-int __receive_data(struct comm_entity *from, struct comm_packet *packet);
-int __send_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH]);
-int __receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH]);
-int __send_file(struct comm_entity *to, char path[FILE_PATH_LENGTH]);
-int __receive_file(struct comm_entity *from, char path[FILE_PATH_LENGTH]);
+struct comm_entity __frontend_entity;
 
 int __command_run(COMM_COMMAND command, struct comm_command_args *args)
 {
@@ -48,9 +42,9 @@ int __command_download(struct comm_command_args *args)
 
     file_path(dest, file, path, FILE_PATH_LENGTH);
 
-    if(__send_command(&(__server_entity), download_command) == 0)
+    if(comm_send_command(&(__server_entity), download_command) == 0)
     {
-        if(__receive_file(&(__server_entity), path) == 0)
+        if(comm_receive_file(&(__server_entity), path) == 0)
         {
             log_debug("comm", "'%s' downloaded", file);
 
@@ -90,9 +84,9 @@ int __command_upload(struct comm_command_args *args)
 
     sprintf(upload_command, "upload %s", filename);
 
-    if(__send_command(&(__server_entity), upload_command) == 0)
+    if(comm_send_command(&(__server_entity), upload_command) == 0)
     {
-        if(__send_file(&(__server_entity), path) == 0)
+        if(comm_send_file(&(__server_entity), path) == 0)
         {
             log_debug("comm", "'%s' uploaded into '%s'", path, filename);
 
@@ -122,7 +116,7 @@ int __command_delete(struct comm_command_args *args)
     bzero(delete_command, COMM_PPAYLOAD_LENGTH);
     sprintf(delete_command, "delete %s", file);
 
-    if(__send_command(&(__server_entity), delete_command) == 0)
+    if(comm_send_command(&(__server_entity), delete_command) == 0)
     {
         log_debug("comm", "'%s' removed", file);
 
@@ -141,66 +135,6 @@ int comm_delete(char *file)
     bzero(args.sendPath, FILE_PATH_LENGTH);
 
     return __command_run(command, &args);
-}
-
-int __command_check_sync(struct comm_command_args *args)
-{
-    char sync_command[COMM_PPAYLOAD_LENGTH];
-    bzero(sync_command, COMM_PPAYLOAD_LENGTH);
-    strcpy(sync_command, "synchronize");
-
-    char command[COMM_PPAYLOAD_LENGTH];
-    char operation[COMM_COMMAND_LENGTH];
-    char file[FILE_NAME_LENGTH];
-    bzero(command, COMM_PPAYLOAD_LENGTH);
-    bzero(operation, COMM_COMMAND_LENGTH);
-    bzero(file, FILE_NAME_LENGTH);
-    struct comm_packet packet;
-
-    if(__send_command(&(__server_entity), sync_command) != 0)
-    {
-        log_error("comm", "Could not send the synchronize command!");
-    }
-    else
-    {
-        if(__receive_data(&(__server_entity), &packet) == 0)
-        {
-            if(strlen(packet.payload) > 6)
-            {
-                strcpy(command, packet.payload);
-                
-                sscanf(command, "%s %[^\n\t]s", operation, file);
-                if(strcmp(operation, "download") == 0)
-                {
-                    struct comm_command_args downloadArgs;
-                    strncpy(downloadArgs.fileName, file, FILE_NAME_LENGTH);
-                    strncpy(downloadArgs.receivePath, "./sync_dir", FILE_PATH_LENGTH);
-                    bzero(downloadArgs.sendPath, FILE_PATH_LENGTH);
-
-                    sync_watcher_stop();
-                    __command_download(&downloadArgs);
-                    sync_watcher_init("sync_dir/");
-                }
-                else if(strcmp(operation, "delete") == 0)
-                {
-                    sync_delete_file(file);
-                }
-
-                return 0;
-            }
-
-            log_debug("comm", "No file to sync!");
-        }
-    }
-
-    return -1;
-}
-
-int comm_check_sync()
-{
-    COMM_COMMAND command = __command_check_sync;
-
-    return __command_run(command, NULL);
 }
 
 int __command_download_all_dir(char *temp_file)
@@ -239,7 +173,7 @@ int __command_download_all_dir(char *temp_file)
 
         sync_watcher_stop();
         __command_download(&downloadArgs);
-        sync_watcher_init("./sync_dir");
+        sync_watcher_init();
     }
 
     fclose(fp);
@@ -251,7 +185,7 @@ int __command_get_sync_dir(struct comm_command_args *args)
 {
     char get_sync_dir_command[COMM_PPAYLOAD_LENGTH] = "get_sync_dir";
 
-    if(__send_command(&(__server_entity), get_sync_dir_command) != 0)
+    if(comm_send_command(&(__server_entity), get_sync_dir_command) != 0)
     {
         log_error("comm", "Send command get_sync_dir error!");
     }
@@ -261,7 +195,7 @@ int __command_get_sync_dir(struct comm_command_args *args)
         bzero(temp_file, FILE_NAME_LENGTH);
         strcat(temp_file, "temp.txt");
 
-        if(__receive_file(&(__server_entity), temp_file) == 0)
+        if(comm_receive_file(&(__server_entity), temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
@@ -287,11 +221,11 @@ int __command_list_server(struct comm_command_args *args)
 {
     char list_server_command[COMM_PPAYLOAD_LENGTH] = "list_server";
 
-    if(__send_command(&(__server_entity), list_server_command) == 0)
+    if(comm_send_command(&(__server_entity), list_server_command) == 0)
     {
         char temp_file[FILE_NAME_LENGTH] = "temp.txt";
 
-        if(__receive_file(&(__server_entity), temp_file) == 0)
+        if(comm_receive_file(&(__server_entity), temp_file) == 0)
         {
             log_debug("comm", "'%s' downloaded", temp_file);
 
@@ -324,75 +258,6 @@ int comm_list_server()
     return __command_run(command, NULL);
 }
 
-void __server_init_sockaddr(struct sockaddr_in *server_sockaddr, struct hostent *server, int port)
-{
-    server_sockaddr->sin_family = AF_INET;
-	server_sockaddr->sin_port = htons(port);
-	server_sockaddr->sin_addr = *((struct in_addr *) server->h_addr_list[0]);
-	bzero((void *) &(server_sockaddr->sin_zero), sizeof(server_sockaddr->sin_zero));
-}
-
-int __login(struct comm_entity *entity, char* username)
-{
-    char login_command[COMM_PPAYLOAD_LENGTH];
-    struct comm_packet packet;
-    int port;
-
-    sprintf(login_command, "login %s", username);
-
-    if(__send_command(entity, login_command) == 0)
-    {
-        if(__receive_data(entity, &packet) == 0)
-        {
-            port = atoi(packet.payload);
-
-            log_debug("comm", "Client port %d", port);
-
-            return port;
-        }
-    }
-
-    return -1;
-}
-
-int comm_init(char* username, char *host, int port)
-{
-    struct hostent *hostent;
-    int tmp_port = port;
-    int new_port;
-
-    if((__server_entity.socket_instance = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-    {
-		log_error("comm", "Could not create socket instance");
-
-        return -1;
-	}
-
-	if((hostent = gethostbyname(host)) == NULL)
-    {
-        log_error("comm", "Could not find the '%s' host", host);
-
-        close(__server_entity.socket_instance);
-
-        return -1;
-    }
-
-    __server_init_sockaddr(&(__server_entity.sockaddr), hostent, tmp_port);
-
-    new_port = __login(&(__server_entity), username);
-
-    if(new_port != -1)
-    {
-        __server_init_sockaddr(&(__server_entity.sockaddr), hostent, new_port);
-
-        return 0;
-    }
-
-    close(__server_entity.socket_instance);
-
-    return -1;
-}
-
 int __command_logout(struct comm_command_args *args)
 {
     char logout_command[COMM_PPAYLOAD_LENGTH];
@@ -400,7 +265,7 @@ int __command_logout(struct comm_command_args *args)
     bzero(logout_command, COMM_PPAYLOAD_LENGTH);
     sprintf(logout_command, "logout");
 
-    if(__send_command(&(__server_entity), logout_command) == 0)
+    if(comm_send_command(&(__server_entity), logout_command) == 0)
     {
         close(__server_entity.socket_instance);
 
@@ -410,11 +275,77 @@ int __command_logout(struct comm_command_args *args)
     return -1;
 }
 
-int comm_stop()
+int comm_logout()
 {
     COMM_COMMAND command = __command_logout;
 
     return __command_run(command, NULL);
+}
+
+int comm_login(struct comm_entity *entity, char* username, int port)
+{
+    char login_command[COMM_PPAYLOAD_LENGTH];
+    struct comm_packet packet;
+    int server_port;
+
+    sprintf(login_command, "login %s %d", username, port);
+
+    if(comm_send_command(entity, login_command) == 0)
+    {
+        if(comm_receive_data(entity, &packet) == 0)
+        {
+            server_port = atoi(packet.payload);
+
+            log_debug("comm", "Client port %d", server_port);
+
+            return server_port;
+        }
+    }
+
+    return -1;
+}
+
+int __command_response_synchronize(struct comm_command_args *args)
+{
+    char path[FILE_PATH_LENGTH];
+    char *file = args->fileName;
+    char *dest = args->receivePath;
+
+    file_path(dest, file, path, FILE_PATH_LENGTH);
+    
+    sync_watcher_stop();
+
+    if(comm_receive_file(&(__frontend_entity), path) == 0)
+    {
+        log_debug("comm", "'%s' synchronized", file);
+
+        sync_watcher_init();
+
+        return 0;
+    }
+
+    sync_watcher_init();
+
+    return -1;
+}
+
+int comm_response_synchronize(char *file)
+{
+    COMM_COMMAND command = __command_response_synchronize;
+    struct comm_command_args args;
+    strncpy(args.fileName, file, FILE_NAME_LENGTH);
+    bzero(args.sendPath, FILE_PATH_LENGTH);
+    strncpy(args.receivePath, "sync_dir", FILE_PATH_LENGTH);
+
+    return __command_run(command, &args);
+}
+
+int comm_init(struct comm_entity server_entity, struct comm_entity receiver_entity)
+{
+    __server_entity = server_entity;
+    __frontend_entity = receiver_entity;
+
+    return 0;
 }
 
 int __send_packet(struct comm_entity *to, struct comm_packet *packet)
@@ -441,7 +372,7 @@ int __receive_packet(struct comm_entity *to, struct comm_packet *packet)
 
     if(poll_status == 0)
     {
-        log_error("comm", "Socket: %d, Connection timed out", to->socket_instance);
+        log_debug("comm", "Socket: %d, Connection timed out", to->socket_instance);
 
         return COMM_ERROR_TIMEOUT;
     }
@@ -453,7 +384,7 @@ int __receive_packet(struct comm_entity *to, struct comm_packet *packet)
     }
     else
     {
-        socklen_t from_length = sizeof(struct sockaddr_in);
+        socklen_t from_length = sizeof(to->sockaddr);
         int status = recvfrom(to->socket_instance, (void *)packet, sizeof(*packet), 0, (struct sockaddr *)&(to->sockaddr), &from_length);
 
         if(status < 0)
@@ -578,11 +509,21 @@ int __reliable_receive_packet(struct comm_entity *from)
 {
     struct comm_packet packet;
     int status = -1;
+    int timeout_count = 0;
 
     do
     {
         status = __receive_packet(from, &packet);
 
+        if(status == COMM_ERROR_TIMEOUT)
+        {
+            timeout_count++;
+
+            if(timeout_count == COMM_MAX_TIMEOUTS)
+            {
+                return -1;
+            }
+        }
     } while(status == COMM_ERROR_TIMEOUT);
 
     if(!__is_packet_already_in_buffer(from, &packet))
@@ -606,7 +547,7 @@ int __reliable_receive_packet(struct comm_entity *from)
     return -1;
 }
 
-int __send_data(struct comm_entity *to, struct comm_packet *packet)
+int comm_send_data(struct comm_entity *to, struct comm_packet *packet)
 {
     log_debug("comm", "Socket: %d, Sending data!", to->socket_instance);
 
@@ -622,7 +563,7 @@ int __send_data(struct comm_entity *to, struct comm_packet *packet)
     return 0;
 }
 
-int __receive_data(struct comm_entity *from, struct comm_packet *packet)
+int comm_receive_data(struct comm_entity *from, struct comm_packet *packet)
 {
     log_debug("comm", "Socket: %d, Receiving data!", from->socket_instance);
 
@@ -648,7 +589,7 @@ int __receive_data(struct comm_entity *from, struct comm_packet *packet)
     return 0;
 }
 
-int __send_command(struct comm_entity *to, char buffer[COMM_PPAYLOAD_LENGTH])
+int comm_send_command(struct comm_entity *to, char buffer[COMM_PPAYLOAD_LENGTH])
 {
     log_debug("comm", "Socket: %d, Sending command!", to->socket_instance);
 
@@ -671,7 +612,7 @@ int __send_command(struct comm_entity *to, char buffer[COMM_PPAYLOAD_LENGTH])
     return 0;
 }
 
-int __receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH])
+int comm_receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH])
 {
     log_debug("comm", "Socket: %d, Receiving command!", from->socket_instance);
 
@@ -702,7 +643,7 @@ int __receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LENGTH
     return 0;
 }
 
-int __send_file(struct comm_entity *to, char path[FILE_PATH_LENGTH])
+int comm_send_file(struct comm_entity *to, char path[FILE_PATH_LENGTH])
 {
     FILE *file = NULL;
     int i;
@@ -728,14 +669,14 @@ int __send_file(struct comm_entity *to, char path[FILE_PATH_LENGTH])
         packet.total_size = num_packets;
         packet.seqn = i;
 
-        __send_data(to, &packet);
+        comm_send_data(to, &packet);
     }
 
     fclose(file);
     return 0;
 }
 
-int __receive_file(struct comm_entity *from, char path[FILE_PATH_LENGTH])
+int comm_receive_file(struct comm_entity *from, char path[FILE_PATH_LENGTH])
 {
     FILE *file = NULL;
     int i;
@@ -750,13 +691,13 @@ int __receive_file(struct comm_entity *from, char path[FILE_PATH_LENGTH])
         return -1;
     }
 
-    if(__receive_data(from, &packet) == 0)
+    if(comm_receive_data(from, &packet) == 0)
     {
         file_write_bytes(file, packet.payload, packet.length);
 
         for(i = 1; i < packet.total_size; i++)
         {
-            __receive_data(from, &packet);
+            comm_receive_data(from, &packet);
             file_write_bytes(file, packet.payload, packet.length);
         }
 
