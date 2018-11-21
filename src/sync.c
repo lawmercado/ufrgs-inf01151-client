@@ -26,11 +26,6 @@ int __inotify_dir_watcher;
 
 char* __watched_dir_path = NULL;
 
-/**
- * Handle an inotify event
- *
- * @param struct inotify_event* event The event
- */
 void __watcher_handle_event(struct inotify_event *event)
 {
     pthread_mutex_lock(&__event_handling_mutex);
@@ -85,10 +80,6 @@ void __watcher_handle_event(struct inotify_event *event)
     pthread_mutex_unlock(&__event_handling_mutex);
 }
 
-/**
- * Unsets the current watcher
- *
- */
 void __watcher_unset()
 {
     // Removes the directory from the watch list
@@ -98,10 +89,6 @@ void __watcher_unset()
     close(__inotify_instance);
 }
 
-/**
- * Sets up the watcher to the specified irectory
- *
- */
 void *__watcher()
 {
     char buffer[EVENT_BUF_LEN];
@@ -204,10 +191,6 @@ int sync_watcher_init()
     return 0;
 }
 
-/**
- * Stop the synchronization process
- *
- */
 void sync_watcher_stop()
 {
     __stop_event_handling = 1;
@@ -222,7 +205,7 @@ void sync_watcher_stop()
 int sync_delete_file(char name[FILE_NAME_LENGTH])
 {
     sync_watcher_stop();
-
+    
     char path[FILE_PATH_LENGTH];
     file_path(__watched_dir_path, name, path, FILE_PATH_LENGTH);
 
@@ -243,11 +226,6 @@ int sync_delete_file(char name[FILE_NAME_LENGTH])
     return 0;
 }
 
-/**
- * List the content of the watched directory
- *
- * @return 0 if no errors, -1 otherwise
- */
 int sync_list_files()
 {
     DIR *watched_dir;
