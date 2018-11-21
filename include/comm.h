@@ -4,7 +4,7 @@
 #include <netdb.h>
 #include "file.h"
 
-#define COMM_TIMEOUT 20000
+#define COMM_TIMEOUT 5000
 #define COMM_ERROR_TIMEOUT -2
 #define COMM_MAX_TIMEOUTS 5
 #define COMM_RECEIVE_BUFFER_LENGTH 10

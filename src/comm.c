@@ -622,7 +622,7 @@ int comm_receive_command(struct comm_entity *from, char buffer[COMM_PPAYLOAD_LEN
 
     if(__reliable_receive_packet(from) != 0)
     {
-        log_error("comm", "Socket: %d, No command could be received.", from->socket_instance);
+        log_debug("comm", "Socket: %d, No command could be received.", from->socket_instance);
 
         return -1;
     }
