@@ -181,11 +181,11 @@ void client_get_sync_dir()
 
 int __handle_command(char *command)
 {
-    char operation[COMM_COMMAND_LENGTH], parameter[COMM_PARAMETER_LENGTH];
+    char operation[COMM_COMMAND_LENGTH], parameter[COMM_PARAMETER_LENGTH], parameter2[COMM_PARAMETER_LENGTH];
 
-    sscanf(command, "%s %[^\n\t]s", operation, parameter);
+    sscanf(command, "%s %s %s", operation, parameter, parameter2);
 
-    log_debug("comm", "Command read '%s %s'", operation, parameter);
+    log_info("comm", "Command read '%s %s %s'", operation, parameter, parameter2);
 
     if(strcmp(operation, "synchronize") == 0)
     {
@@ -194,6 +194,14 @@ int __handle_command(char *command)
     else if(strcmp(operation, "delete") == 0)
     {
         return sync_delete_file(parameter);
+    }
+    else if(strcmp(operation, "recon") == 0)
+    {
+        int new_port = atoi(parameter2);
+
+        utils_init_sockaddr_to_host(&(__server_entity.sockaddr), new_port, parameter);
+
+        return comm_init(__server_entity, __frontend_entity);
     }
 
     return 0;
@@ -233,7 +241,7 @@ int __setup_receiver()
 
     if(pthread_create(&__frontend_thread, NULL, __receive, NULL) != 0)
     {
-
+        log_error("comm", "Could not create the receiver thread");
     }
 
     return 0;
